@@ -6,7 +6,21 @@ A constant work in progress.
 
 ## Installing
 
-As a plugin — in Claude Code, this installs everything under `skills/` and picks up new ones when you update:
+### Copy or symlink
+
+Copy or symlink a single skill into an agent's skills directory:
+
+```sh
+cp -r "$PWD/skills/<name>" ~/.claude/skills/<name>
+```
+
+```sh
+ln -s "$PWD/skills/<name>" ~/.claude/skills/<name>
+```
+
+### As a plugin
+
+In Claude Code, this installs everything under `skills/` and picks up new ones when you update:
 
 ```
 /plugin marketplace add andresthor/skills
@@ -14,12 +28,6 @@ As a plugin — in Claude Code, this installs everything under `skills/` and pic
 ```
 
 Skills then appear under the `ats:` prefix, so `orchestrate` is invoked as `ats:orchestrate`.
-
-Or symlink a single skill into an agent's skills directory:
-
-```sh
-ln -s "$PWD/skills/<name>" ~/.claude/skills/<name>
-```
 
 ## License
 
