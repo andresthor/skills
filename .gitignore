@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+
+# skill-creator scratch dirs — iteration output, not part of a skill
+*-workspace/
+
+# agent-local config
+.claude/settings.local.json
+.claude/skills/
+CLAUDE.local.md
+.context/
+
+# editors
+.idea/
+.vscode/
+*.swp
+

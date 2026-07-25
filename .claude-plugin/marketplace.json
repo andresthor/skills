@@ -1,0 +1,16 @@
+{
+  "name": "andresthor",
+  "owner": {
+    "name": "Andres Thor Saemundsson"
+  },
+  "description": "Skills I find useful.",
+  "plugins": [
+    {
+      "name": "ats",
+      "source": "./",
+      "description": "Agent skills for explaining, pressure-testing, and handing off work in progress.",
+      "category": "engineering",
+      "keywords": ["skills", "workflow", "handoff", "documentation"]
+    }
+  ]
+}

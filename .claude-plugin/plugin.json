@@ -1,0 +1,11 @@
+{
+  "name": "ats",
+  "version": "1.0.0",
+  "description": "Agent skills for explaining, pressure-testing, and handing off work in progress.",
+  "author": {
+    "name": "Andres Thor Saemundsson"
+  },
+  "repository": "https://github.com/andresthor/skills",
+  "license": "MIT",
+  "keywords": ["skills", "workflow", "handoff", "documentation"]
+}
