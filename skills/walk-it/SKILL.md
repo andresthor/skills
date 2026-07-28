@@ -11,7 +11,7 @@ description: >-
   is) — walk-it guides *what to do* with it.
 argument-hint: "[what to walk through — omit if already in context]"
 metadata:
-  version: 1.0.0
+  version: 1.1.0
 ---
 
 ## What to do
@@ -50,6 +50,21 @@ Two rules hold this together, and both matter:
 - **Never decide on the user's behalf that this one is fine to print.** "They're only reading, not doing" is not a reason to hand over the whole list. Reading is the most common case, and it is still a walkthrough.
 
 The one exception is an explicit, unprompted request from the user — "just give me the whole thing," "dump it all." That's their call, so honor it. You never propose it.
+
+## Progress line
+
+Open every paced step with a one-line progress marker, so the user always knows how long the walkthrough is and where they are in it:
+
+```
+Step 2 of 5 — Wire up the handler
+●●○○○
+```
+
+The label is a two-or-three-word name for the current step only. Never name the steps that come after it; a count is orientation, a preview is the dump this skill exists to prevent.
+
+Commit to a total before step 1 and hold it. If the walkthrough genuinely grows or shrinks once you're inside it, say so in one short line — "this splits into two, so 6 total now" — and carry on with the corrected count. Silently drifting from 5 to 8 is worse than either.
+
+Skip the progress line entirely for trivial inline walkthroughs. A three-item list carries its own count.
 
 ## Testing walkthroughs
 
