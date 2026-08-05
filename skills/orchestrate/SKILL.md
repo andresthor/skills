@@ -10,10 +10,12 @@ description: >-
   work in parallel, run a debate or adversarial panel, build a multi-phase pipeline, or says things
   like "spin up agents to…", "design a process for…", "I want a few agents that…", "orchestrate this
   for me", or "set up a flow to…". Reach for it even when the user never says "agents" but is plainly
-  describing work that wants decomposition, parallelism, or staged verification.
-argument-hint: "[free-text: what you're trying to do + the deliverable you want + any constraints or prior failures]"
+  describing work that wants decomposition, parallelism, or staged verification. Also use it when
+  they want to see or approve the orchestration setup before it runs — "--gate", "show me the plan
+  first", "check with me before you spawn anything".
+argument-hint: "[--gate] [free-text: what you're trying to do + the deliverable you want + any constraints or prior failures]"
 metadata:
-  version: 1.0.0
+  version: 1.1.0
 ---
 
 # orchestrate
@@ -48,6 +50,8 @@ This skill is self-contained — it carries its own condensed pattern library an
 
 ### 1 · Capture intent
 Read the invocation arguments and the recent conversation. The input is free text — likely vague, possibly voice-transcribed. Extract everything you can about the goal and, especially, the **deliverable**. Draw on the conversation and any file or prior run the user clearly refers to — don't ask for what's already in front of you. (If they say "fix the last run" and a relevant prompt, handoff, or obvious file is around, use it rather than reconstructing from one sentence.) If the input is *genuinely* too thin to assess, ask once, openly — don't open with a barrage of defaulted questions.
+
+**Note whether the run is gated.** The user can ask to see the setup before anything spawns — `--gate` in the arguments, or just plainly: "show me the plan first", "check with me before you start", "I want to approve the orchestration". Carry that as a flag. It changes nothing about *what* you design — only that step 6 stops and shows it before step 7 runs. If they didn't ask, the gate is off and step 6's proportionality rules decide on their own whether to confirm.
 
 ### 2 · Assess against the rubric
 Map the intent onto the eight dimensions (`dimension-matrix.md`). Tag each one:
@@ -91,10 +95,21 @@ Before sizing anything, pick **how** the run executes. This forks on the run's *
 
 **Consensus/debate lands here, not in mechanism 2 by default.** A *simple* consensus or debate round — N blind attempts, then a vote/synthesis pass — is independent subagents plus a synthesis step (mechanism 3). Escalate to an agent-team (2) only when agents must hear and rebut each other mid-run.
 
-### 6 · Size the subagent run and choose where it executes
-Applies to the **subagent mechanism**; agent-teams and workflows skip this and run in-session.
+### 6 · Echo the config, clear the gate, size the subagent run
 
-**Echo the resolved config first, always** — a compact block (e.g. `panel · converge · adversarial: single · inline · spend: pilot`), defaulted entries marked. One glance tells the user what's about to happen and lets them override before anything spawns.
+#### The approval gate — every mechanism
+A gated run does not start until the user says so, whichever mechanism step 5 picked: subagent fan-out, agent-team, and workflow alike. Draw a good representation of the plan as an ascii diagram in the chat and 2–4 bullets on why this shape, and the halt conditions. Then stop and wait.
+
+A diagram is the right medium because what the user is approving is a **shape** — who runs, in what order, gated on what, producing what — and prose conveys that badly. Keep the text around it short; if you're writing three paragraphs under the diagram, the diagram isn't doing its job.
+
+- **They approve** → run it as drawn (step 7).
+- **They want changes** → revise the plan, re-render the diagram once, ask again. The gate is a checkpoint, not a design session — don't turn it into an interview.
+- **A gated run overrides "run immediately when cheap" below.** A two-agent panel still stops if they asked to see it.
+
+**Gated but headless** (a parent agent passed the gate through and there is no human to approve it): you can't gate against nobody, and running anyway defeats the request. Return the diagram and config as your result, say plainly that nothing was spawned, and stop. This is the one case where the plan is the deliverable rather than a playbook.
+
+#### Sizing and placement — subagent mechanism only
+Agent-teams and workflows skip this and run in-session.
 
 **Where it runs (proportionality):**
 - **Inline** — run it yourself in this session — when scale is **solo or panel** (1–3 agents) with light returns. You keep full visibility for trivial context cost.
@@ -102,9 +117,11 @@ Applies to the **subagent mechanism**; agent-teams and workflows skip this and r
 
 **Whether to confirm before spawning (cost):**
 - **Run immediately** when cheap — solo/panel AND capped/pilot spend. The config echo is the checkpoint; don't make the user say "go" for a three-agent pilot. Announce that you're starting, then start.
-- **Confirm first** — surface roster + shape + rough cost, offer **Edit | Run** — when expensive: scale is **team/pipeline**, OR spend is **uncapped**, OR irreversible actions are in scope. Don't spawn until they say go.
+- **Confirm first** — surface roster + shape + rough cost, offer **Edit | Run** — when expensive: scale is **team/pipeline**, OR spend is **uncapped**, OR irreversible actions are in scope. Don't spawn until they say go. At team/pipeline scale, draw the shape as an ascii diagram instead of listing the roster in prose — it's the same moment as the gate, and the same reason applies.
 
 ### 7 · Run it
+The gate, if there was one, is cleared before anything spawns — including before an offloaded runner. You draw the diagram from *your* assembled plan; the runner never renders one, it just executes.
+
 **Give every spawned agent a role identity** (`proposer`, `skeptic`, `landscape-scanner`, `data-and-analytics-expert`, …), never a generic label — undifferentiated agents are unreadable in logs. *How* you carry the role depends on whether agents must address each other:
 - **Agents that talk to each other (agent-team)** need a real addressable **name** — Claude Code's `Agent` `name` parameter, OpenCode's `task` `description`, etc. Only the primary session can spawn named teammates; the roster is flat, so a spawned agent cannot spawn further named teammates.
 - **Independent fan-out (subagents, incl. an offloaded runner's roster)** doesn't need addressability — carry the role in the prompt/label, spawn them as plain subagents. Do **not** name them as teammates; a teammate (including an offloaded runner) that tries to spawn named teammates is rejected by the flat roster.
@@ -126,4 +143,5 @@ Deliver the result: the synthesized output (converge) or the set of artifacts wi
 - **Not one-size-fits-all** — ceremony scales with the run; small runs stay inline and light, big independent fan-outs offload (agent-teams and workflows stay in-session whatever their size).
 - **Not a narrator** — when you run, you orchestrate (spawn, coordinate, govern, synthesize); you don't relay every agent turn through yourself and flatten the disagreement.
 - **Not an unguarded spender** — cheap runs go immediately; team/pipeline/uncapped runs confirm first; irreversible actions always gate.
+- **Not a gate that nobody asked for** — the approval gate fires when the user requests it or when cost triggers a confirmation, never as a default politeness round.
 - **Not project-coupled** — self-contained; carries its own pattern library.
