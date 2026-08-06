@@ -1,21 +1,16 @@
 ---
 name: orchestrate
 description: >-
-  Turns free-text intent into a tailored multi-agent, multi-phase process and then runs it. The user
-  — or, headless, a calling agent — describes the goal and the deliverable they want; this skill
-  assesses that against a codified library of orchestration patterns, asks only about the gaps that
-  genuinely fork the run, then spawns, coordinates, and synthesizes the agents itself. It executes
-  the process; it does not just draft a prompt. Use whenever the user wants to set up a multi-agent
-  run, orchestrate subagents, design and run a research / review / eval / design process, fan out
-  work in parallel, run a debate or adversarial panel, build a multi-phase pipeline, or says things
-  like "spin up agents to…", "design a process for…", "I want a few agents that…", "orchestrate this
-  for me", or "set up a flow to…". Reach for it even when the user never says "agents" but is plainly
-  describing work that wants decomposition, parallelism, or staged verification. Also use it when
-  they want to see or approve the orchestration setup before it runs — "--gate", "show me the plan
-  first", "check with me before you spawn anything".
+  Designs a multi-agent, multi-phase process from free-text intent and then runs it — spawning,
+  coordinating, and synthesizing the agents itself rather than just drafting a prompt. Use it to
+  orchestrate subagents, fan work out in parallel, run a debate or adversarial panel, or build a
+  staged research / review / eval / design pipeline — "spin up agents to…", "design a process for…",
+  "orchestrate this for me", "set up a flow to…". Reach for it even when the user never says "agents"
+  but describes work wanting decomposition, parallelism, or staged verification. Pass --gate ("show
+  me the plan first") to approve the setup before anything spawns.
 argument-hint: "[--gate] [free-text: what you're trying to do + the deliverable you want + any constraints or prior failures]"
 metadata:
-  version: 1.1.0
+  version: 1.1.1
 ---
 
 # orchestrate
