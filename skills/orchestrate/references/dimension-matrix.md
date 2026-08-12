@@ -49,6 +49,7 @@ ephemeral · working-dir coordination (named files as phase gates) · handoff + 
 - **Default:** **working-dir coordination** for team/pipeline; ephemeral for solo/panel one-shots; handoff+PROGRESS when multi-session is implied.
 - **Resolving signals:** "across sessions", "this is phase 2", "long-running".
 - **Why LOW:** derivable from D3; safe default [P2].
+- **Even ephemeral runs have a path.** The plan file is written on every run (SKILL.md step 6), so `ephemeral` means "no coordination files between agents", not "nowhere to write". Resolve a path anyway: the runtime's scratch or temp directory, otherwise an `orchestration/` directory beside the work.
 
 ## D8 — Spend posture · LOW divergence
 one-shot · pilot-then-scale · hard cap + per-step approval

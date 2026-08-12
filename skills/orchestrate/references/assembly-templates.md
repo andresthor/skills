@@ -35,6 +35,7 @@ you checkpoint at boundaries and keep the run on its objective.
 
 ## State & coordination                       [P2/P3 — D7]
 Working directory: <path>. All output goes to named files there.
+Plan file: <path>/orchestration-plan.md — goal, stats, diagram; written before anything spawns [always-on].
 <handoff.md / PROGRESS.md / decision-record per round — when multi-phase/session>
 
 ## Spend & gates                              [P7/P12 — D8]

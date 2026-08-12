@@ -10,7 +10,7 @@ description: >-
   me the plan first") to approve the setup before anything spawns.
 argument-hint: "[--gate] [free-text: what you're trying to do + the deliverable you want + any constraints or prior failures]"
 metadata:
-  version: 1.1.1
+  version: 1.2.0
 ---
 
 # orchestrate
@@ -70,6 +70,7 @@ Everything else — even if ambiguous — gets a sensible default, shown in the 
 
 ### 4 · Assemble the plan
 Build the plan from the skeleton in `assembly-templates.md` per the resolved config; pick the fan-out and collaboration presets, and for multi-stage work the phased **research → debate** shape (reach for a direct-comms **agent-team** only when the friction *between* agents is the point — both covered there). Then **inject the always-on layer regardless of what was asked** — this is where the quality lives:
+- the **plan file** — `orchestration-plan.md` in the run's working directory, registered as a named output; drawn and written before anything spawns [step 6]
 - no-veto + lead stripped of synthesis, whenever >1 agent [P5]
 - prevention cluster: scope-elimination [P11] + halt conditions + irreversible-action gate [P12, P7]
 - **role identities** — every agent carries a distinct role, never a generic label; agents that must address each other are named teammates, independent fan-out just labels the role in the prompt [always-on — see step 7]
@@ -90,18 +91,25 @@ Before sizing anything, pick **how** the run executes. This forks on the run's *
 
 **Consensus/debate lands here, not in mechanism 2 by default.** A *simple* consensus or debate round — N blind attempts, then a vote/synthesis pass — is independent subagents plus a synthesis step (mechanism 3). Escalate to an agent-team (2) only when agents must hear and rebut each other mid-run.
 
-### 6 · Echo the config, clear the gate, size the subagent run
+### 6 · Draw the plan, echo the config, clear the gate, size the subagent run
+
+#### Draw the plan — unconditional
+**Every run draws its plan as an ASCII diagram and writes it to a file, whether or not the run is gated.** Drawing is not gating: a diagram is an artifact, a gate is a stop. The gate below decides whether you *wait*; it never decides whether you *draw*.
+
+A diagram is the right medium because a plan is a **shape** — who runs, in what order, gated on what, what comes out the end — and prose conveys that badly. Draw the shape the run actually has; orchestrations come in shapes nobody has seen yet, so there is no template to fill in. **If the runtime has a skill for drawing ASCII diagrams, use it** — a dedicated one will pick a form and keep it legible better than a format spec bolted onto this skill. If there isn't one, just draw it; a plain, readable diagram beats a styled one.
+
+Write the diagram to `orchestration-plan.md` in the run's working directory, and render the same diagram in the chat. The file holds **three things and nothing else**: the goal as a heading, a one-line stats summary (fan-out · scale · placement · spend · what happens next), and the diagram in a fenced code block so it renders monospace. No rationale, no roster table, no closing summary — that material is chat-only, and the file is worthless the moment it becomes a document. Rewrite it in place if the plan changes, so it always shows what actually ran.
+
+If D7 resolved to `ephemeral` there is still a path: the runtime's scratch or temp directory, otherwise an `orchestration/` directory beside the work. Say where it went. "There was nowhere to put it" is not a reason to skip the file.
 
 #### The approval gate — every mechanism
-A gated run does not start until the user says so, whichever mechanism step 5 picked: subagent fan-out, agent-team, and workflow alike. Draw a good representation of the plan as an ascii diagram in the chat and 2–4 bullets on why this shape, and the halt conditions. Then stop and wait.
-
-A diagram is the right medium because what the user is approving is a **shape** — who runs, in what order, gated on what, producing what — and prose conveys that badly. Keep the text around it short; if you're writing three paragraphs under the diagram, the diagram isn't doing its job.
+A gated run does not start until the user says so, whichever mechanism step 5 picked: subagent fan-out, agent-team, and workflow alike. Present the diagram you just drew, 2–4 bullets on why this shape, and the halt conditions. Then stop and wait.
 
 - **They approve** → run it as drawn (step 7).
-- **They want changes** → revise the plan, re-render the diagram once, ask again. The gate is a checkpoint, not a design session — don't turn it into an interview.
+- **They want changes** → revise the plan, rewrite `orchestration-plan.md`, re-render the diagram once, ask again. The gate is a checkpoint, not a design session — don't turn it into an interview.
 - **A gated run overrides "run immediately when cheap" below.** A two-agent panel still stops if they asked to see it.
 
-**Gated but headless** (a parent agent passed the gate through and there is no human to approve it): you can't gate against nobody, and running anyway defeats the request. Return the diagram and config as your result, say plainly that nothing was spawned, and stop. This is the one case where the plan is the deliverable rather than a playbook.
+**Gated but headless** (a parent agent passed the gate through and there is no human to approve it): you can't gate against nobody, and running anyway defeats the request. Return the diagram and config as your result along with the path to `orchestration-plan.md`, say plainly that nothing was spawned, and stop. This is the one case where the plan is the deliverable rather than a playbook.
 
 #### Sizing and placement — subagent mechanism only
 Agent-teams and workflows skip this and run in-session.
@@ -111,11 +119,11 @@ Agent-teams and workflows skip this and run in-session.
 - **Offload** — spawn a runner in its own context — when scale is **team or pipeline** (5+ subagents), OR the run has **heavy returns** even at panel size. *Heavy* = a role does web/research, or its deliverable is a multi-section report; one heavy role is enough to tip a panel to offload. Offloading is what keeps a big fan-out from flooding this conversation — the whole reason it exists.
 
 **Whether to confirm before spawning (cost):**
-- **Run immediately** when cheap — solo/panel AND capped/pilot spend. The config echo is the checkpoint; don't make the user say "go" for a three-agent pilot. Announce that you're starting, then start.
-- **Confirm first** — surface roster + shape + rough cost, offer **Edit | Run** — when expensive: scale is **team/pipeline**, OR spend is **uncapped**, OR irreversible actions are in scope. Don't spawn until they say go. At team/pipeline scale, draw the shape as an ascii diagram instead of listing the roster in prose — it's the same moment as the gate, and the same reason applies.
+- **Run immediately** when cheap — solo/panel AND capped/pilot spend. The diagram and config echo are the checkpoint; don't make the user say "go" for a three-agent pilot. Announce that you're starting, then start.
+- **Confirm first** — surface roster + shape + rough cost, offer **Edit | Run** — when expensive: scale is **team/pipeline**, OR spend is **uncapped**, OR irreversible actions are in scope. Don't spawn until they say go. The diagram you already drew carries the roster and the shape; don't restate them in prose beside it.
 
 ### 7 · Run it
-The gate, if there was one, is cleared before anything spawns — including before an offloaded runner. You draw the diagram from *your* assembled plan; the runner never renders one, it just executes.
+**Nothing spawns until `orchestration-plan.md` exists** — for every mechanism, at every size, gated or not, and before you hand a brief to an offloaded runner. Treat it like the phase gates you enforce on your own roster: a written file is observable, "I pictured the shape" is not. You draw the diagram and write the file from *your* assembled plan; the runner never renders one, it just executes. The gate, if there was one, is cleared before anything spawns.
 
 **Give every spawned agent a role identity** (`proposer`, `skeptic`, `landscape-scanner`, `data-and-analytics-expert`, …), never a generic label — undifferentiated agents are unreadable in logs. *How* you carry the role depends on whether agents must address each other:
 - **Agents that talk to each other (agent-team)** need a real addressable **name** — Claude Code's `Agent` `name` parameter, OpenCode's `task` `description`, etc. Only the primary session can spawn named teammates; the roster is flat, so a spawned agent cannot spawn further named teammates.
@@ -138,5 +146,7 @@ Deliver the result: the synthesized output (converge) or the set of artifacts wi
 - **Not one-size-fits-all** — ceremony scales with the run; small runs stay inline and light, big independent fan-outs offload (agent-teams and workflows stay in-session whatever their size).
 - **Not a narrator** — when you run, you orchestrate (spawn, coordinate, govern, synthesize); you don't relay every agent turn through yourself and flatten the disagreement.
 - **Not an unguarded spender** — cheap runs go immediately; team/pipeline/uncapped runs confirm first; irreversible actions always gate.
-- **Not a gate that nobody asked for** — the approval gate fires when the user requests it or when cost triggers a confirmation, never as a default politeness round.
+- **Not a gate that nobody asked for** — the approval *gate* fires when the user requests it or when cost triggers a confirmation, never as a default politeness round. The *diagram* is a separate thing and is never conditional.
+- **Never spawns undrawn** — every run draws its plan and writes `orchestration-plan.md` before the first agent exists. A run with no diagram is a bug, not a judgment call.
+- **Not a diagram format police** — the shape is mandatory, the styling is not; defer to an installed ASCII-diagram skill and never grade the output against a house template.
 - **Not project-coupled** — self-contained; carries its own pattern library.
