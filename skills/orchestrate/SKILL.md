@@ -10,7 +10,7 @@ description: >-
   me the plan first") to approve the setup before anything spawns.
 argument-hint: "[--gate] [free-text: what you're trying to do + the deliverable you want + any constraints or prior failures]"
 metadata:
-  version: 1.2.0
+  version: 1.2.1
 ---
 
 # orchestrate
@@ -70,7 +70,7 @@ Everything else — even if ambiguous — gets a sensible default, shown in the 
 
 ### 4 · Assemble the plan
 Build the plan from the skeleton in `assembly-templates.md` per the resolved config; pick the fan-out and collaboration presets, and for multi-stage work the phased **research → debate** shape (reach for a direct-comms **agent-team** only when the friction *between* agents is the point — both covered there). Then **inject the always-on layer regardless of what was asked** — this is where the quality lives:
-- the **plan file** — `orchestration-plan.md` in the run's working directory, registered as a named output; drawn and written before anything spawns [step 6]
+- the **plan file** — `orchestration-plan-<goal-slug>.md` in the run's working directory, registered as a named output under its resolved concrete name; drawn and written before anything spawns [step 6]
 - no-veto + lead stripped of synthesis, whenever >1 agent [P5]
 - prevention cluster: scope-elimination [P11] + halt conditions + irreversible-action gate [P12, P7]
 - **role identities** — every agent carries a distinct role, never a generic label; agents that must address each other are named teammates, independent fan-out just labels the role in the prompt [always-on — see step 7]
@@ -98,7 +98,11 @@ Before sizing anything, pick **how** the run executes. This forks on the run's *
 
 A diagram is the right medium because a plan is a **shape** — who runs, in what order, gated on what, what comes out the end — and prose conveys that badly. Draw the shape the run actually has; orchestrations come in shapes nobody has seen yet, so there is no template to fill in. **If the runtime has a skill for drawing ASCII diagrams, use it** — a dedicated one will pick a form and keep it legible better than a format spec bolted onto this skill. If there isn't one, just draw it; a plain, readable diagram beats a styled one.
 
-Write the diagram to `orchestration-plan.md` in the run's working directory, and render the same diagram in the chat. The file holds **three things and nothing else**: the goal as a heading, a one-line stats summary (fan-out · scale · placement · spend · what happens next), and the diagram in a fenced code block so it renders monospace. No rationale, no roster table, no closing summary — that material is chat-only, and the file is worthless the moment it becomes a document. Rewrite it in place if the plan changes, so it always shows what actually ran.
+Write the diagram to the plan file in the run's working directory, and render the same diagram in the chat. The file holds **three things and nothing else**: the goal as a heading, a one-line stats summary (fan-out · scale · placement · spend · what happens next), and the diagram in a fenced code block so it renders monospace. No rationale, no roster table, no closing summary — that material is chat-only, and the file is worthless the moment it becomes a document.
+
+**Name the file for the run, not for the skill.** It is `orchestration-plan-<goal-slug>.md`, where the slug is 2–4 lowercase hyphenated words naming *this* run's deliverable — `orchestration-plan-auth-migration-review.md`, `orchestration-plan-pricing-research.md`. A working directory is usually a project folder that outlives any one orchestration, so a fixed name quietly destroys the previous run's plan the moment a later, unrelated run lands in the same place. Resolve the name once during assembly and carry that exact string everywhere the plan is referenced — the execution brief, the named-output gates, the path you report back. The runner never re-derives it.
+
+**Never overwrite a plan file this run didn't write.** Rewriting in place covers revisions *within* the current run — the gate sent you back, the shape changed — so the file always shows what actually ran; it covers nothing else. If the resolved name already exists on disk, read its first line, which is the goal heading. A different goal is a different run's plan: take the next free suffix (`…-2.md`) and leave the original alone. The same goal means you are deliberately re-running or iterating on that plan [P1] — overwrite it, but say so.
 
 If D7 resolved to `ephemeral` there is still a path: the runtime's scratch or temp directory, otherwise an `orchestration/` directory beside the work. Say where it went. "There was nowhere to put it" is not a reason to skip the file.
 
@@ -106,10 +110,10 @@ If D7 resolved to `ephemeral` there is still a path: the runtime's scratch or te
 A gated run does not start until the user says so, whichever mechanism step 5 picked: subagent fan-out, agent-team, and workflow alike. Present the diagram you just drew, 2–4 bullets on why this shape, and the halt conditions. Then stop and wait.
 
 - **They approve** → run it as drawn (step 7).
-- **They want changes** → revise the plan, rewrite `orchestration-plan.md`, re-render the diagram once, ask again. The gate is a checkpoint, not a design session — don't turn it into an interview.
+- **They want changes** → revise the plan, rewrite the plan file in place, re-render the diagram once, ask again. The gate is a checkpoint, not a design session — don't turn it into an interview.
 - **A gated run overrides "run immediately when cheap" below.** A two-agent panel still stops if they asked to see it.
 
-**Gated but headless** (a parent agent passed the gate through and there is no human to approve it): you can't gate against nobody, and running anyway defeats the request. Return the diagram and config as your result along with the path to `orchestration-plan.md`, say plainly that nothing was spawned, and stop. This is the one case where the plan is the deliverable rather than a playbook.
+**Gated but headless** (a parent agent passed the gate through and there is no human to approve it): you can't gate against nobody, and running anyway defeats the request. Return the diagram and config as your result along with the resolved path to the plan file, say plainly that nothing was spawned, and stop. This is the one case where the plan is the deliverable rather than a playbook.
 
 #### Sizing and placement — subagent mechanism only
 Agent-teams and workflows skip this and run in-session.
@@ -123,7 +127,7 @@ Agent-teams and workflows skip this and run in-session.
 - **Confirm first** — surface roster + shape + rough cost, offer **Edit | Run** — when expensive: scale is **team/pipeline**, OR spend is **uncapped**, OR irreversible actions are in scope. Don't spawn until they say go. The diagram you already drew carries the roster and the shape; don't restate them in prose beside it.
 
 ### 7 · Run it
-**Nothing spawns until `orchestration-plan.md` exists** — for every mechanism, at every size, gated or not, and before you hand a brief to an offloaded runner. Treat it like the phase gates you enforce on your own roster: a written file is observable, "I pictured the shape" is not. You draw the diagram and write the file from *your* assembled plan; the runner never renders one, it just executes. The gate, if there was one, is cleared before anything spawns.
+**Nothing spawns until the plan file exists** — for every mechanism, at every size, gated or not, and before you hand a brief to an offloaded runner. Treat it like the phase gates you enforce on your own roster: a written file is observable, "I pictured the shape" is not. You draw the diagram and write the file from *your* assembled plan; the runner never renders one, it just executes. The gate, if there was one, is cleared before anything spawns.
 
 **Give every spawned agent a role identity** (`proposer`, `skeptic`, `landscape-scanner`, `data-and-analytics-expert`, …), never a generic label — undifferentiated agents are unreadable in logs. *How* you carry the role depends on whether agents must address each other:
 - **Agents that talk to each other (agent-team)** need a real addressable **name** — Claude Code's `Agent` `name` parameter, OpenCode's `task` `description`, etc. Only the primary session can spawn named teammates; the roster is flat, so a spawned agent cannot spawn further named teammates.
@@ -147,6 +151,6 @@ Deliver the result: the synthesized output (converge) or the set of artifacts wi
 - **Not a narrator** — when you run, you orchestrate (spawn, coordinate, govern, synthesize); you don't relay every agent turn through yourself and flatten the disagreement.
 - **Not an unguarded spender** — cheap runs go immediately; team/pipeline/uncapped runs confirm first; irreversible actions always gate.
 - **Not a gate that nobody asked for** — the approval *gate* fires when the user requests it or when cost triggers a confirmation, never as a default politeness round. The *diagram* is a separate thing and is never conditional.
-- **Never spawns undrawn** — every run draws its plan and writes `orchestration-plan.md` before the first agent exists. A run with no diagram is a bug, not a judgment call.
+- **Never spawns undrawn** — every run draws its plan and writes its own plan file before the first agent exists. A run with no diagram is a bug, not a judgment call.
 - **Not a diagram format police** — the shape is mandatory, the styling is not; defer to an installed ASCII-diagram skill and never grade the output against a house template.
 - **Not project-coupled** — self-contained; carries its own pattern library.
