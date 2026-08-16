@@ -10,7 +10,7 @@ description: >-
   me the plan first") to approve the setup before anything spawns.
 argument-hint: "[--gate] [free-text: what you're trying to do + the deliverable you want + any constraints or prior failures]"
 metadata:
-  version: 1.2.1
+  version: 1.3.0
 ---
 
 # orchestrate
@@ -136,7 +136,8 @@ Agent-teams and workflows skip this and run in-session.
 **Inline (small runs).** Spawn the roster here with the runtime's agent-spawning tool (such as `Agent`, `task`, `runSubagent`). Hold the gates between phases — a phase begins only when the prior phase's named output files all exist (observe the files, don't poll the agents). Govern drift by naming an agent's exact wrong assumption [P10], not by re-issuing the instruction. Use the runtime's inter-agent messaging mechanism, if available (such as `SendMessage`), for an agent-team's direct comms; use the runtime's user-question tool (such as `AskUserQuestion`, `question`, `ask_question`) for genuine mid-run ambiguity — you're in-session, so you can. Be an orchestrator, not a narrator: checkpoint at boundaries, let agents do their work, don't paraphrase every turn through yourself (that flattens disagreement — the failure the agent-team shape exists to prevent).
 
 **Offloaded (large *independent* fan-out only).** Offload applies to the subagent mechanism, never to an agent-team or a workflow. Assemble the **execution brief** (`assembly-templates.md` → "Execution brief for an offloaded runner") — the locked plan *plus* the execution-time countermeasures (no-veto + lead-stripped, phase gates, role identities, synthesis, the irreversible-action rule) so the runner is a full orchestrator, not a config-follower. Spawn **one** general-purpose agent, labelled `runner`, with that brief; it fans out in its own context and returns only its RESULT. You relay the result.
-- **The runner spawns plain subagents, not named teammates.** Its roster is independent fan-out — role carried in the prompt, no cross-agent addressing — so the flat-roster rule is never hit. If the design needs agents to address each other, it's an agent-team: pull it back inline (mechanism 2), don't offload it.
+- **Offload only where a spawned agent can itself spawn.** Some runtimes strip the spawn tool from spawned sessions or cap nesting depth; a runner without it degrades to one agent role-playing the whole roster, which defeats the design. If you can't confirm the capability from the runtime's config or docs, run the fan-out inline instead and say that's why the shape changed. The brief's spawn preflight is the backstop that catches a wrong guess, not the check itself.
+- **The runner spawns plain subagents, not named teammates — and spawns them synchronously.** Its roster is independent fan-out — role carried in the prompt, no cross-agent addressing — so the flat-roster rule is never hit. A spawned agent also cannot launch background agents (in Claude Code: omit `name`, set `run_in_background=false`); the runner gets parallelism by issuing its spawns as one batch of calls, not from background mode. If the design needs agents to address each other, it's an agent-team: pull it back inline (mechanism 2), don't offload it.
 - **Don't babysit it.** Once the brief is handed off, let it run to completion. It resolves mid-run ambiguity by defaulting-and-noting (it can't reach the human), not by bouncing back to you for a question.
 - **Irreversible actions:** an offloaded runner completes all *reversible* work and returns with the irreversible step flagged for you or the user to execute — it never performs an unconfirmed push / publish / post / delete / migrate. Inline, you gate these live with the user when you reach them.
 

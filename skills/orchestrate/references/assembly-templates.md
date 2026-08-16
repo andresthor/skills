@@ -141,9 +141,17 @@ plan below to completion and return the result.
  state & coordination, spend & gates>
 
 ## How to run it
+- FIRST, preflight your spawn capability: confirm an agent-spawning tool is in your function set,
+  then spawn one trivial probe subagent ("reply with the word ok" — nothing else). If the tool is
+  missing or the probe fails, STOP and return immediately, reporting the missing capability.
+  Do NOT execute the roster's roles yourself — a solo role-play of the plan is a failed run,
+  not a fallback, and this is the one gap you never default-and-note your way through.
 - Spawn the roster with the runtime's agent-spawning tool (such as `Agent`, `task`, `runSubagent`)
   as **plain subagents** — carry each role in the prompt, do NOT register them as named teammates.
   You are yourself a spawned agent; the team roster is flat, so a named-teammate spawn is rejected.
+  Spawn them **synchronously** too — a spawned agent cannot launch background agents (in Claude
+  Code: omit `name`, set `run_in_background=false`). For parallelism, issue the spawns as one
+  batch of tool calls in a single message; background mode is not how you fan out.
   Your roster is independent fan-out and never addresses itself, so it needs no addressable names.
   (If a design ever needs agents to address each other, it is an agent-team — it cannot be offloaded
   and must not have been handed to you; return and flag it rather than forcing it here.)
