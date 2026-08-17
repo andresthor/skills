@@ -8,9 +8,9 @@
     {
       "name": "ats",
       "source": "./",
-      "description": "Agent skills for explaining, pressure-testing, and handing off work in progress.",
+      "description": "Agent skills for planning, explaining, pressure-testing, and handing off work in progress.",
       "category": "engineering",
-      "keywords": ["skills", "workflow", "handoff", "documentation"]
+      "keywords": ["skills", "workflow", "planning", "handoff", "documentation"]
     }
   ]
 }
