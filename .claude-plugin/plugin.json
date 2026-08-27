@@ -1,6 +1,6 @@
 {
   "name": "ats",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Agent skills for planning, explaining, pressure-testing, and handing off work in progress.",
   "author": {
     "name": "Andres Thor Saemundsson"
