@@ -26,6 +26,7 @@ Guarantees: upsert replaces the entry with the same slug (or the same handoff pa
 is preserved byte-for-byte; a value that fails validation is refused (exit 2) before anything is written.
 exit 0 ok · 1 check found problems · 2 refused / usage
 """
+import argparse
 import datetime
 import json
 import os
@@ -47,6 +48,13 @@ SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 def die(msg, code=2):
     print(f"handoff-pointer: {msg}", file=sys.stderr)
     sys.exit(code)
+
+
+def write_atomic(path, text):
+    tmp = path + ".tmp"
+    with open(tmp, "w") as fh:
+        fh.write(text)
+    os.replace(tmp, path)
 
 
 def repo_root(pointer_path):
@@ -119,8 +127,12 @@ def validate(vals, root):
     hp = vals.get("handoff", "")
     if not HANDOFF_NAME_RE.match(os.path.basename(hp)):
         problems.append(f"handoff must end in handoff.md or NN-handoff.md: {hp!r}")
-    elif not os.path.exists(os.path.join(root, hp)):
-        problems.append(f"handoff file does not exist: {hp}")
+    else:
+        full = os.path.realpath(os.path.join(root, hp))
+        if not full.startswith(os.path.realpath(root) + os.sep):
+            problems.append(f"handoff path escapes the repo root: {hp}")
+        elif not os.path.exists(full):
+            problems.append(f"handoff file does not exist: {hp}")
     if not re.match(r"^\d{4}-\d{2}-\d{2}$", vals.get("updated", "")):
         problems.append(f"updated must be YYYY-MM-DD: {vals.get('updated')!r}")
     return problems
@@ -153,13 +165,15 @@ def cmd_upsert(path, opts, dry):
     if problems:
         die("refusing to write:\n  " + "\n  ".join(problems))
     text = open(path).read() if os.path.exists(path) else ""
-    _, _, entries = parse(text)
+    stamp, _, entries = parse(text)
+    if entries and not stamp:
+        die(f"pointer is format 1 — run `migrate` first so the file does not end up mixed-format")
     others = [e for e in entries if e[0] != vals["slug"] and e[1].get("handoff") != vals["handoff"]]
     new = render([(vals["slug"], vals, entry_lines(vals))] + others)
     if dry:
         print(new, end="")
     else:
-        open(path, "w").write(new)
+        write_atomic(path, new)
     print(f"upserted {vals['slug']} at the top; {len(others)} other entries preserved; {len(entries) - len(others)} replaced")
 
 
@@ -215,7 +229,7 @@ def cmd_remove(path, slug):
     keep = [e for e in entries if e[0] != slug]
     if len(keep) == len(entries):
         die(f"no entry with slug {slug!r}", 1)
-    open(path, "w").write(render(keep))
+    write_atomic(path, render(keep))
     print(f"removed {slug}; {len(keep)} entries remain")
 
 
@@ -235,7 +249,7 @@ def cmd_prune(path, days, dry):
     if not drop:
         print("nothing to prune")
     elif not dry:
-        open(path, "w").write(render(keep))
+        write_atomic(path, render(keep))
 
 
 def cmd_migrate(path, write):
@@ -255,12 +269,14 @@ def cmd_migrate(path, write):
         status = f.get("status", "")
         up = status.upper()
         state = ("superseded" if "SUPERSEDED" in up else "done" if re.search(r"\b(MERGED|COMPLETE|DONE|SHIPPED)\b", up)
-                 else "blocked" if re.search(r"\b(BLOCKED|ON HOLD|PARKED)\b", up) else "in-progress")
+                 else "blocked" if re.search(r"\b(BLOCKED|ON HOLD|PARKED)\b", up)
+                 else "review" if re.search(r"\b(REVIEW|PR OPEN|AWAITING)\b", up) else "in-progress")
         nxt = "TODO: set with handoff-pointer upsert (old status in the .format1.bak)"
         branch = re.sub(r"\s.*$", "", f.get("branch", ""))
         head = re.match(r"[0-9a-f]+", f.get("head", "")) and re.match(r"[0-9a-f]+", f.get("head", "")).group(0) or ""
-        dm = re.search(r"\d+", f.get("dirty", "0"))
-        dirty = "0" if f.get("dirty", "").startswith("no") else (dm.group(0) if dm else "0")
+        dval = f.get("dirty", "")
+        dm = re.search(r"\d+", dval)
+        dirty = "0" if dval.startswith("no") or not dval else (dm.group(0) if dm else "1")
         vals = dict(slug=slug, branch=branch, head=head, dirty=dirty, state=state, next=nxt,
                     handoff=f.get("handoff", ""), updated=f.get("updated", ""))
         for p in validate(vals, root):
@@ -274,44 +290,49 @@ def cmd_migrate(path, write):
         print("note:", n, file=sys.stderr)
     if write:
         bak = path + ".format1.bak"
-        open(bak, "w").write(text)
-        open(path, "w").write(new)
+        write_atomic(bak, text)
+        write_atomic(path, new)
         print(f"written; format-1 copy at {bak}", file=sys.stderr)
     else:
         print("dry run — pass --write to apply", file=sys.stderr)
 
 
 def main(argv):
-    if len(argv) < 3:
-        print(__doc__)
-        return 2
-    path, cmd, rest = argv[1], argv[2], argv[3:]
-    opts, flags = {}, set()
-    i = 0
-    while i < len(rest):
-        a = rest[i]
-        if a.startswith("--") and i + 1 < len(rest) and not rest[i + 1].startswith("--"):
-            opts[a[2:]] = rest[i + 1]
-            i += 2
-        else:
-            flags.add(a[2:])
-            i += 1
-    if cmd != "upsert" and not os.path.exists(path):
+    ap = argparse.ArgumentParser(prog="handoff-pointer", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("pointer", help="path to HANDOFF.md")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    up = sub.add_parser("upsert")
+    for f in ["slug"] + FIELDS:
+        up.add_argument("--" + f, required=(f != "updated"))
+    up.add_argument("--dry-run", action="store_true")
+    sh = sub.add_parser("show")
+    sh.add_argument("--slug")
+    sh.add_argument("--branch")
+    ck = sub.add_parser("check")
+    ck.add_argument("--dead", action="store_true")
+    rm = sub.add_parser("remove")
+    rm.add_argument("--slug", required=True)
+    pr = sub.add_parser("prune")
+    pr.add_argument("--older-than", type=int, default=14, metavar="DAYS")
+    pr.add_argument("--dry-run", action="store_true")
+    mg = sub.add_parser("migrate")
+    mg.add_argument("--write", action="store_true")
+    a = ap.parse_args(argv[1:])
+    path = a.pointer
+    if a.cmd != "upsert" and not os.path.exists(path):
         die(f"no such file: {path}")
-    if cmd == "upsert":
-        cmd_upsert(path, opts, "dry-run" in flags)
-    elif cmd == "show":
-        cmd_show(path, opts)
-    elif cmd == "check":
-        cmd_check(path, "dead" in flags)
-    elif cmd == "remove":
-        cmd_remove(path, opts.get("slug") or die("remove needs --slug"))
-    elif cmd == "prune":
-        cmd_prune(path, int(opts.get("older-than", 14)), "dry-run" in flags)
-    elif cmd == "migrate":
-        cmd_migrate(path, "write" in flags)
-    else:
-        die(f"unknown command {cmd!r}")
+    if a.cmd == "upsert":
+        cmd_upsert(path, {k: v for k, v in vars(a).items() if k in ["slug"] + FIELDS}, a.dry_run)
+    elif a.cmd == "show":
+        cmd_show(path, dict(slug=a.slug, branch=a.branch))
+    elif a.cmd == "check":
+        cmd_check(path, a.dead)
+    elif a.cmd == "remove":
+        cmd_remove(path, a.slug)
+    elif a.cmd == "prune":
+        cmd_prune(path, a.older_than, a.dry_run)
+    elif a.cmd == "migrate":
+        cmd_migrate(path, a.write)
     return 0
 
 

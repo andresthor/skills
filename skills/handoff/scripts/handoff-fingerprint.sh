@@ -5,6 +5,9 @@ set -euo pipefail
 cd "${1:-.}"
 branch=$(git rev-parse --abbrev-ref HEAD)
 head=$(git rev-parse --short HEAD)
-dirty=$(git status --short | grep -c . || true)
-files=$(git status --short | awk '{printf "%s\"%s\"", (NR>1?",":""), $NF}')
-printf '{"branch":"%s","head":"%s","dirty":%s,"dirty_files":[%s]}\n' "$branch" "$head" "$dirty" "$files"
+git -c core.quotepath=false status --porcelain=v1 -z | python3 -c '
+import json, sys
+raw = sys.stdin.buffer.read().decode("utf-8", "replace").split("\0")
+files = [r[3:] for r in raw if len(r) > 3]
+print(json.dumps({"branch": sys.argv[1], "head": sys.argv[2], "dirty": len(files), "dirty_files": files}))
+' "$branch" "$head"

@@ -23,6 +23,7 @@ Warnings are density signals a reader would notice; they never fail the run.
   D2  decisions.md line over 160 characters                      (warn)
   D3  decisions.md over 40 lines, or holds headings / nesting / strikethrough   (warn)
 """
+import argparse
 import json
 import os
 import re
@@ -89,7 +90,15 @@ def lint_entry(path, start, header, body, is_top, prev_nonblank):
     if chars > ENTRY_MAX_CHARS:
         err(start, "B1", f"entry is {chars} chars (cap {ENTRY_MAX_CHARS}) — cut, move the rest to notes.md")
 
-    labels = [(i, LABEL_RE.match(l.strip())) for i, l in enumerate(content) if LABEL_RE.match(l.strip())]
+    labels = []
+    in_fence = False
+    for i, l in enumerate(content):
+        if l.strip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        lm = LABEL_RE.match(l.strip())
+        if lm and not in_fence:
+            labels.append((i, lm))
     names = [lm.group(1).strip() for _, lm in labels]
     expected = [n for n in names if n in SECTIONS]
     if expected != SECTIONS:
@@ -184,19 +193,23 @@ def lint_decisions(path):
 
 
 def main(argv):
-    if len(argv) < 2:
-        print(__doc__)
+    ap = argparse.ArgumentParser(prog="handoff-lint", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("handoff", help="path to handoff.md")
+    ap.add_argument("--all", action="store_true", help="lint every entry, not only the top one")
+    ap.add_argument("--decisions", metavar="decisions.md")
+    ap.add_argument("--json", action="store_true")
+    a = ap.parse_args(argv[1:])
+    if not os.path.exists(a.handoff):
+        print(f"no such file: {a.handoff}")
         return 2
-    path = argv[1]
-    if not os.path.exists(path):
-        print(f"no such file: {path}")
-        return 2
-    dec = argv[argv.index("--decisions") + 1] if "--decisions" in argv else None
-    v = lint_handoff(path, "--all" in argv)
-    if dec and os.path.exists(dec):
-        v += lint_decisions(dec)
+    v = lint_handoff(a.handoff, a.all)
+    if a.decisions:
+        if os.path.exists(a.decisions):
+            v += lint_decisions(a.decisions)
+        else:
+            print(f"note: no decisions file at {a.decisions}")
     errs = [x for x in v if x["level"] == "error"]
-    if "--json" in argv:
+    if a.json:
         print(json.dumps(dict(errors=len(errs), warnings=len(v) - len(errs), findings=v), indent=1))
     else:
         for x in sorted(v, key=lambda x: (x["file"], x["line"])):

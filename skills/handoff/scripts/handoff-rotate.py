@@ -8,6 +8,7 @@ moves to the `-archive` sibling (`handoff-archive.md` / `NN-handoff-archive.md`)
 the archive already holds. The preamble before the first entry stays in place. Running twice is a no-op.
 exit 0 rotated or nothing to do · 2 refused (no entries parsed)
 """
+import argparse
 import json
 import os
 import re
@@ -83,22 +84,28 @@ def rotate(path, threshold, keep, force, dry):
                archive_lines=new_archive.count("\n"), archive_entries=len(moved) + len(aents),
                moved_dates=[HEADER_RE.match(m).group(1) for m in moved])
     if not dry:
-        open(ap, "w").write(new_archive)
-        open(path, "w").write(new_handoff)
+        for target, content in ((ap, new_archive), (path, new_handoff)):
+            tmp = target + ".tmp"
+            with open(tmp, "w") as fh:
+                fh.write(content)
+            os.replace(tmp, target)
     return res
 
 
 def main(argv):
-    if len(argv) < 2 or not os.path.exists(argv[1]):
-        print(__doc__)
+    ap = argparse.ArgumentParser(prog="handoff-rotate", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("handoff", help="path to handoff.md")
+    ap.add_argument("--threshold", type=int, default=180)
+    ap.add_argument("--keep", type=int, default=2)
+    ap.add_argument("--force", action="store_true")
+    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--json", action="store_true")
+    a = ap.parse_args(argv[1:])
+    if not os.path.exists(a.handoff):
+        print(f"no such file: {a.handoff}")
         return 2
-    a = argv[1:]
-
-    def opt(name, default):
-        return type(default)(a[a.index(name) + 1]) if name in a else default
-
-    res = rotate(a[0], opt("--threshold", 180), opt("--keep", 2), "--force" in a, "--dry-run" in a)
-    if "--json" in a:
+    res = rotate(a.handoff, a.threshold, a.keep, a.force, a.dry_run)
+    if a.json:
         print(json.dumps(res, indent=1))
     else:
         print(f"{'rotated' if res['rotated'] else 'no-op'}: " + ", ".join(f"{k}={v}" for k, v in res.items() if k not in ("file", "rotated")))
