@@ -10,7 +10,7 @@ description: >-
 argument-hint: "[project-slug] [--go — start the next step without asking]"
 allowed-tools: Bash(git *), Bash(gh pr view *), Bash(python3 *), Bash(bash *), Read, Glob, Grep, AskUserQuestion
 metadata:
-  version: 2.0.0
+  version: 2.0.1
 ---
 
 # Pickup
@@ -25,7 +25,7 @@ The scripts live in the handoff skill: `../handoff/scripts/` relative to this fi
 
 Resolve the pointer exactly as handoff's Step 1 does — the user's declared root for generated files, else `.context/HANDOFF.md`, else `HANDOFF.md` at the repo root. Answer the first case from the instructions already in your context; take the first location that resolves and move on. If none resolves, say so and ask which project to pick up; don't guess.
 
-The pointer must start with `<!-- handoff-format: 2 -->`. If it doesn't, it was written by an older handoff: say so, offer `python3 <scripts>/handoff-pointer.py <HANDOFF.md> migrate` (dry run first, `--write` on the user's yes), and skip the fast path below — the old fields are not comparable.
+If the pointer's first line is not `<!-- handoff-format: 2 -->`, it was written by an older handoff. Read `../handoff/references/migrate.md` and follow it before continuing — it converts the file once, by you, and the user runs nothing.
 
 Select the block with the script, never by reading the whole file:
 

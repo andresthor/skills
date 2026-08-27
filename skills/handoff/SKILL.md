@@ -10,7 +10,7 @@ description: >-
 argument-hint: "[project-slug] [--next '<one action, ≤80 chars>'] [--close]"
 allowed-tools: Bash(git *), Bash(gh pr view *), Bash(mkdir *), Bash(python3 *), Bash(bash *), Read, Glob, Grep, Write, Edit, AskUserQuestion
 metadata:
-  version: 2.0.0
+  version: 2.1.0
 ---
 
 # Handoff
@@ -143,7 +143,7 @@ python3 <scripts>/handoff-pointer.py <HANDOFF.md> upsert --slug <slug> \
 - `branch`, `head`, `dirty` are the fingerprint values exactly — no annotations, no merge notes, no file names. Pickup compares them byte-for-byte; anything appended breaks the comparison and belongs in the entry.
 - `state` is one of `in-progress | blocked | review | done | parked | superseded`. `next` is one action, no `;`, never "optional …" — if the only remaining work is optional, the state is `done`.
 - The script moves this project's block to the top, preserves every other block byte-for-byte, and refuses a `handoff:` path that does not exist or is not a handoff file. If it refuses, fix the input; never edit `HANDOFF.md` by hand.
-- If the file is not format 2 (no stamp on line 1), run `handoff-pointer.py <HANDOFF.md> migrate` first, show the user the dry run, then `--write`.
+- If `HANDOFF.md` exists and its first line is not `<!-- handoff-format: 2 -->`, stop and read `references/migrate.md` beside this file; it walks you through converting the pointer once. The user runs nothing.
 - **`--close`**: the project is finished (merged, superseded, nothing next). Write a terminal entry (`state: done`: what merged, where the report is, one don't-retry line), then `handoff-pointer.py <HANDOFF.md> remove --slug <slug>`. Its history stays in the project dir.
 - If a new session continues work on a branch that already has a pointer block, update that block — pickup resolves by branch and cannot tell two blocks on one branch apart.
 
