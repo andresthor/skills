@@ -10,7 +10,7 @@ description: >-
 argument-hint: "[project-slug] [--next '<one action, ≤80 chars>'] [--close]"
 allowed-tools: Bash(git *), Bash(gh pr view *), Bash(mkdir *), Bash(python3 *), Bash(bash *), Read, Glob, Grep, Write, Edit, AskUserQuestion
 metadata:
-  version: 2.1.0
+  version: 2.2.0
 ---
 
 # Handoff
@@ -105,6 +105,10 @@ Standing decisions and standing watch-outs that outlive one session live in the 
 **Scope gate — decisions about the project, never about you.** A line qualifies only if it records a settled call about the work: design, scope, process, don't-re-raise items, ideally attributed. Never your own workflow or communication preferences, lessons from your own mistakes, or anything that belongs in the user's instruction files. A missing line costs one question; a junk line pollutes every future pickup.
 
 If this session reverses a decision recorded in **another** project's `decisions.md`, mark that line `SUPERSEDED:` there with one clause on why. That is maintaining the record, not clobbering another project.
+
+## Step 5b — update the ops file, if one exists
+
+If the project dir holds a `linear-ops.md`, it is the project's durable contract with Linear and it must not fall behind the session. Record every change through the script — never by hand: `python3 ~/.agents/skills/scope-it/scripts/ops.py <file> …` with `add` for a newly scheduled event or due action, `resolve <n>` for anything that happened, `decision answered` for a decision that was answered, `map set` for a new identifier. Then run `… check`; a non-zero exit is reported in Step 9, not fixed by editing the file. The entry's Next up may point at `/scope-it sync` but never repeats the ops file's contents.
 
 ## Step 6 — lint the entry
 

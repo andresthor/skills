@@ -10,7 +10,7 @@ description: >-
 argument-hint: "[project-slug] [--go — start the next step without asking]"
 allowed-tools: Bash(git *), Bash(gh pr view *), Bash(python3 *), Bash(bash *), Read, Glob, Grep, AskUserQuestion
 metadata:
-  version: 2.0.1
+  version: 2.1.0
 ---
 
 # Pickup
@@ -58,6 +58,7 @@ A short summary, never a paste of the file. Bullets, each under ~15 words:
 - **Branch** — confirmed, or the mismatch and your recommendation.
 - **Standing decisions** — only those that affect the proposed step.
 - **Drift** — anything that changed since the handoff, including "merged".
+- **Ops** — only if a `linear-ops.md` sits in the project dir: run `python3 ~/.agents/skills/scope-it/scripts/ops.py <file> show --due` and report its first line plus any due item. A due item makes `/scope-it sync` the proposed step unless Next up item 1 outranks it (a due *event* means "ask what happened", not "do it").
 - **Proposed next step** — Next up item 1, adjusted for drift, as a concrete action you're ready to take.
 - `read: <n> chars entry / <n> chars decisions / <n> chars pointer` — the cost of this pickup, so bloat is visible where it is paid.
 
