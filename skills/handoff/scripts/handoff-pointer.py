@@ -128,8 +128,16 @@ def validate(vals, root):
     if not HANDOFF_NAME_RE.match(os.path.basename(hp)):
         problems.append(f"handoff must end in handoff.md or NN-handoff.md: {hp!r}")
     else:
-        full = os.path.realpath(os.path.join(root, hp))
-        if not full.startswith(os.path.realpath(root) + os.sep):
+        # A path escapes the repo root only if it climbs out lexically (a `..`
+        # that leaves <root>). Symlinks under the repo that point elsewhere
+        # (e.g. .context/projects -> a vault dir) are legitimate in-repo paths
+        # and must not be rejected; realpath would collapse them and falsely
+        # flag them as escaping.
+        joined = os.path.normpath(os.path.join(root, hp))
+        rel = os.path.relpath(joined, root)
+        escaped = rel.startswith(".." + os.sep) or rel == ".."
+        full = os.path.realpath(joined)
+        if escaped:
             problems.append(f"handoff path escapes the repo root: {hp}")
         elif not os.path.exists(full):
             problems.append(f"handoff file does not exist: {hp}")

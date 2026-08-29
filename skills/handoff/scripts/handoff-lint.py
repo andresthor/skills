@@ -165,7 +165,13 @@ def lint_handoff(path, all_entries):
     v = []
     stamps = [HEADER_RE.match(e[1]).group(1) + (HEADER_RE.match(e[1]).group(2) or "") for e in entries]
     if stamps != sorted(stamps, reverse=True):
-        v.append(dict(file=path, line=entries[0][0], level="error", rule="H3", msg="entries are not newest on top"))
+        # Name the first out-of-order pair so the reader goes straight to it
+        offenders = []
+        for i in range(1, len(stamps)):
+            if stamps[i] > stamps[i - 1]:
+                offenders.append(f"'{stamps[i]}' at line {entries[i][0]} sorts above '{stamps[i - 1]}' at line {entries[i - 1][0]}")
+        detail = "; ".join(offenders) or "entries are not newest on top"
+        v.append(dict(file=path, line=entries[0][0], level="error", rule="H3", msg=f"entries are not newest on top: {detail}"))
     for k, (start, header, body) in enumerate(entries):
         if k > 0 and not all_entries:
             break

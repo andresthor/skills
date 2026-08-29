@@ -10,7 +10,7 @@ description: >-
 argument-hint: "[project-slug] [--next '<one action, ≤80 chars>'] [--close]"
 allowed-tools: Bash(git *), Bash(gh pr view *), Bash(mkdir *), Bash(python3 *), Bash(bash *), Read, Glob, Grep, Write, Edit, AskUserQuestion
 metadata:
-  version: 2.2.0
+  version: 2.2.1
 ---
 
 # Handoff
