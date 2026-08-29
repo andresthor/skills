@@ -220,7 +220,8 @@ def main(argv):
     else:
         for x in sorted(v, key=lambda x: (x["file"], x["line"])):
             print(f"{x['file']}:{x['line']}: {x['level']} {x['rule']}: {x['msg']}")
-        print(f"-- {len(errs)} errors, {len(v) - len(errs)} warnings")
+        warns = len(v) - len(errs)
+        print(f"-- {len(errs)} error(s) (must fix and re-run), {warns} warning(s) (optional — leave standing, report in Step 9)")
     return 1 if errs else 0
 
 

@@ -10,7 +10,7 @@ description: >-
 argument-hint: "[project-slug] [--next '<one action, ≤80 chars>'] [--close]"
 allowed-tools: Bash(git *), Bash(gh pr view *), Bash(mkdir *), Bash(python3 *), Bash(bash *), Read, Glob, Grep, Write, Edit, AskUserQuestion
 metadata:
-  version: 2.2.1
+  version: 2.3.0
 ---
 
 # Handoff
@@ -71,7 +71,7 @@ Read the real state; the conversation is not it:
 
 ## Step 4 — write the handoff entry
 
-One running file per project, appended over time — not a file per session. If a handoff file already exists in the project dir (`handoff.md` or `NN-handoff.md`), keep its name; creating fresh, use `NN-handoff.md` if the dir uses `NN-` numbering, else `handoff.md`. The new entry goes on top, older entries stay below a `---` divider.
+One running file per project, appended over time — not a file per session. If a handoff file already exists in the project dir (`handoff.md` or `NN-handoff.md`), keep its name; creating fresh, use `NN-handoff.md` if the dir uses `NN-` numbering, else `handoff.md`. The new entry goes on top, older entries stay below a `---` divider. On a fresh file, line 1 is a one-line note naming the discipline — `> Written in the style of the /handoff skill — one fact per line, one sentence max, no narrative. See skills/handoff/SKILL.md.` — followed by a blank line. It sits above the first heading, passes lint clean, and survives rotation; an agent editing the file mid-session without loading this skill reads it before adding a paragraph.
 
 **Limits.** An entry is at most 1,800 characters, no line over 160. One fact per line, at most one sentence. No `;`, no `·`, no inline `(1) … (2)` lists, at most one parenthetical, no em-dash except the label's own. A second clause is a second bullet, or it is cut. These are measured in characters because a line budget is met by unwrapping — the entry gets shorter in lines and longer in every way that matters. The lint in Step 6 counts; you do not have to.
 
@@ -100,7 +100,7 @@ The heading is the date only, `## Handoff YYYY-MM-DD`; a second entry the same d
 
 ## Step 5 — update decisions.md
 
-Standing decisions and standing watch-outs that outlive one session live in the project dir's `decisions.md`, not in entries. Shape: a flat bullet list, one decision per bullet, one physical line under 160 characters, no headings except the title, no nesting, no strikethrough, no "corrected by" trailers — edit in place or delete. Keep it under 40 lines; rationale longer than a line goes in `notes.md` with a one-line verdict here pointing at it.
+Standing decisions and standing watch-outs that outlive one session live in the project dir's `decisions.md`, not in entries. Shape: a flat bullet list, one decision per bullet, one physical line under 160 characters, no headings except the title, no nesting, no strikethrough, no "corrected by" trailers — edit in place or delete. Keep it under 40 lines; rationale longer than a line goes in `notes.md` with a one-line verdict here pointing at it. On a fresh file, line 1 is `> Written in the style of the /handoff skill — one decision per line, flat, no narrative. See skills/handoff/SKILL.md.` above the title, so a mid-session edit that never loaded this skill still keeps it flat.
 
 **Scope gate — decisions about the project, never about you.** A line qualifies only if it records a settled call about the work: design, scope, process, don't-re-raise items, ideally attributed. Never your own workflow or communication preferences, lessons from your own mistakes, or anything that belongs in the user's instruction files. A missing line costs one question; a junk line pollutes every future pickup.
 
@@ -112,7 +112,7 @@ If the project dir holds a `linear-ops.md`, it is the project's durable contract
 
 ## Step 6 — lint the entry
 
-`python3 <scripts>/handoff-lint.py <handoff.md> --decisions <decisions.md>`. Fix every error and re-run, at most twice, then continue regardless — the lint informs the handoff, it never blocks it. When a line is too long or too dense, cut it or move the material to `notes.md` and leave one pointer line; do not split one thought into fragments to satisfy the counter. Warnings and any errors still standing are reported in Step 9.
+`python3 <scripts>/handoff-lint.py <handoff.md> --decisions <decisions.md>`. **Errors only** trigger a fix-and-re-run, at most twice; warnings never do — they are density signals, not failures, and chasing them is how a handoff burns a session. The tally line names which is which. When a line is too long or too dense, cut it or move the material to `notes.md` and leave one pointer line; do not split one thought into fragments to satisfy the counter. Warnings and any errors still standing are reported in Step 9.
 
 ## Step 7 — rotate
 
@@ -130,6 +130,7 @@ Only after the handoff file is final, so the pointer never names a half-written 
 - branch: feat-add-session-cache
 - head: 3f9c2a1
 - dirty: 0
+- commits: 2
 - state: in-progress
 - next: run the backfill against staging
 - handoff: .context/projects/2026-08/03-session-cache/handoff.md
@@ -145,6 +146,7 @@ python3 <scripts>/handoff-pointer.py <HANDOFF.md> upsert --slug <slug> \
 ```
 
 - `branch`, `head`, `dirty` are the fingerprint values exactly — no annotations, no merge notes, no file names. Pickup compares them byte-for-byte; anything appended breaks the comparison and belongs in the entry.
+- `commits` is the count of branch commits beyond `origin/main` at handoff time, computed by the script — do not pass it. `0` means the work is planning-only and lives in uncommitted docs; pickup skips the merge check for those, so a branch that has not diverged is never read as "merged." Absent (no local `origin/main`) means the script could not compute it and pickup falls back to the check.
 - `state` is one of `in-progress | blocked | review | done | parked | superseded`. `next` is one action, no `;`, never "optional …" — if the only remaining work is optional, the state is `done`.
 - The script moves this project's block to the top, preserves every other block byte-for-byte, and refuses a `handoff:` path that does not exist or is not a handoff file. If it refuses, fix the input; never edit `HANDOFF.md` by hand.
 - If `HANDOFF.md` exists and its first line is not `<!-- handoff-format: 2 -->`, stop and read `references/migrate.md` beside this file; it walks you through converting the pointer once. The user runs nothing.

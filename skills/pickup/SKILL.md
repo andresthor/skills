@@ -10,7 +10,7 @@ description: >-
 argument-hint: "[project-slug] [--go — start the next step without asking]"
 allowed-tools: Bash(git *), Bash(gh pr view *), Bash(python3 *), Bash(bash *), Read, Glob, Grep, AskUserQuestion
 metadata:
-  version: 2.1.0
+  version: 2.2.0
 ---
 
 # Pickup
@@ -32,7 +32,7 @@ Select the block with the script, never by reading the whole file:
 - A slug was passed → `handoff-pointer.py <HANDOFF.md> show --slug <slug>`.
 - Else → `show --branch "$(git rev-parse --abbrev-ref HEAD)"`. If nothing matches, `show` with no filter lists every block: name the slugs and ask which to pick up. If the branch matches more than one block, list them and ask.
 
-Then run `handoff-pointer.py <HANDOFF.md> check --dead`. It reports structural problems and, using `git merge-base --is-ancestor <head> origin/main` per block, any block whose work is already in main. Report dead blocks as `dead: <slug> (head in main since …)` and offer `handoff-pointer.py <HANDOFF.md> prune`; the user confirms before anything is removed.
+Then run `handoff-pointer.py <HANDOFF.md> check --dead`. It reports structural problems and, using `git merge-base --is-ancestor <head> origin/main` per block, any block whose work is already in main. A block with `commits: 0` is skipped by the dead check — a branch with no commits of its own cannot have merged, so a planning-only branch never lands on the dead list. Report dead blocks as `dead: <slug> (head in main since …)` and offer `handoff-pointer.py <HANDOFF.md> prune`; the user confirms before anything is removed.
 
 ## Step 2 — read the handoff
 
@@ -42,7 +42,9 @@ Open the file named by `handoff:`. Read the **top entry only** — stop at the f
 
 Compare the block's `branch`, `head`, `dirty` against `bash <scripts>/handoff-fingerprint.sh`. `head` is a prefix match — the two were produced by `git rev-parse --short` at different times and may differ in length.
 
-- **All three match** → also confirm the work has not merged underneath you: `git fetch -q && git merge-base --is-ancestor <head> origin/main` (no origin → say so and take the full flow). If the entry names a PR and `gh` is available, `gh pr view <n> --json state,mergedAt`. A head already in main or a PR in state MERGED means the handoff is describing finished work: say "this merged as #N on <date>", and treat it as a mismatch below. Otherwise the repo provably hasn't moved: skip Step 4, orient in two lines, ask to proceed.
+- **`commits: 0` (planning branch)** → the branch has no commits of its own; the work lives in uncommitted docs. Do not fetch, do not run `check --dead`, do not run `merge-base — the repo cannot have merged work that does not exist. Skip to the orientation, report `read:` cost, ask to proceed. This is the fast path, and it is the common case for planning that runs for weeks before the first commit.
+- **All three match** → also confirm the work has not merged underneath you: `git fetch -q && git merge-base --is-ancestor <head> origin/main` (no origin → say so and take the full flow). Skip this when the block is `commits: 0` — that case is handled above. If the entry names a PR and `gh` is available, `gh pr view <n> --json state,mergedAt`. A head already in main or a PR in state MERGED means the handoff is describing finished work: say "this merged as #N on <date>", and treat it as a mismatch below. Otherwise the repo provably hasn't moved: skip Step 4, orient in two lines, ask to proceed.
+- **`commits` absent (old pointer)** → run the merge check as above. The first `/handoff` on the project adds the field; until then the check is the fallback.
 - **Branch mismatch** (a slug was passed, or the user chose a project on another branch) → do not check out anything. Say "this handoff is for `<X>`, you're on `<Y>`", offer to switch or to continue where you are, and wait.
 - **Head or dirty mismatch, merged, or stale** (`updated:` more than 30 days ago → say "stale — verify before trusting") → full flow, Step 4.
 

@@ -2,8 +2,8 @@
 """handoff-pointer: the only writer of the HANDOFF.md pointer file.
 
 usage:
-  handoff-pointer.py <HANDOFF.md> upsert --slug S --branch B --head H --dirty N --state STATE --next "…" --handoff PATH [--updated YYYY-MM-DD] [--dry-run]
-  handoff-pointer.py <HANDOFF.md> show   [--slug S | --branch B]      # selected entry as JSON (all entries if neither)
+  handoff-pointer.py <HANDOFF.md> upsert --slug S --branch B --head H --dirty N --commits N --state STATE --next "…" --handoff PATH [--updated YYYY-MM-DD] [--dry-run]
+  handoff-pointer.py <HANDOFF.md> show   [--slug S | --branch B] [--all]  # selected entry as JSON (compact list if no filter; --all for full JSON)
   handoff-pointer.py <HANDOFF.md> check  [--dead]                     # report problems; --dead also tests heads against origin/main
   handoff-pointer.py <HANDOFF.md> remove --slug S
   handoff-pointer.py <HANDOFF.md> prune  [--older-than DAYS] [--dry-run]   # drop done/superseded entries older than DAYS (default 14)
@@ -17,6 +17,7 @@ Format 2:
   - branch: <git rev-parse --abbrev-ref HEAD>
   - head: <git rev-parse --short HEAD>
   - dirty: <count of `git status --short` lines>
+  - commits: <count of branch commits beyond origin/main; 0 = planning-only, uncommitted work>
   - state: in-progress | blocked | review | done | parked | superseded
   - next: <one action, ≤80 chars, no ';'>
   - handoff: <path to handoff.md or NN-handoff.md, relative to the repo root>
@@ -36,7 +37,10 @@ import sys
 
 FORMAT = 2
 STAMP = f"<!-- handoff-format: {FORMAT} -->"
-FIELDS = ["branch", "head", "dirty", "state", "next", "handoff", "updated"]
+# commits is optional on the CLI (computed from git if absent) but always written when known,
+# so it is a FIELDS entry that renders like the rest. It is NOT required by upsert's `missing` check.
+FIELDS = ["branch", "head", "dirty", "commits", "state", "next", "handoff", "updated"]
+OPTIONAL_FIELDS = {"commits", "updated"}
 STATES = ["in-progress", "blocked", "review", "done", "parked", "superseded"]
 NEXT_MAX = 80
 HEAD_RE = re.compile(r"^[0-9a-f]{7,40}$")
@@ -61,6 +65,25 @@ def repo_root(pointer_path):
     """The pointer lives at <root>/.context/HANDOFF.md or <root>/HANDOFF.md; handoff: paths are relative to <root>."""
     d = os.path.dirname(os.path.abspath(pointer_path))
     return os.path.dirname(d) if os.path.basename(d) == ".context" else d
+
+
+def count_commits(root, head):
+    """Own commits on the branch beyond local origin/main (no fetch). None when unknowable.
+
+    A planning branch that has not diverged returns 0 — the signal pickup reads to skip the
+    merge check entirely. Stale local origin/main is fine here: the question is only "does this
+    branch have any commits of its own," not "are they shipped." No fetch — computing this must
+    never trigger the network round-trip that the field exists to avoid."""
+    try:
+        # Count the RECORDED branch head, not the working tree — the user may be writing a
+        # handoff from a different checkout, or --head may name an older commit than HEAD.
+        r = subprocess.run(["git", "-C", root, "rev-list", "--count", f"origin/main..{head}"],
+                           capture_output=True, text=True, timeout=15)
+        if r.returncode == 0:
+            return r.stdout.strip() or "0"
+    except Exception:
+        pass
+    return None
 
 
 # ---------- parsing ----------
@@ -102,7 +125,9 @@ def render(entries):
 
 
 def entry_lines(vals):
-    return [f"- {f}: {vals[f]}" for f in FIELDS]
+    # Optional fields (commits, updated) may be absent — a migrated block has no git state to
+    # compute commits from, so it is omitted rather than written as an empty line.
+    return [f"- {f}: {vals[f]}" for f in FIELDS if f not in OPTIONAL_FIELDS or vals.get(f) not in (None, "")]
 
 
 # ---------- validation ----------
@@ -117,6 +142,9 @@ def validate(vals, root):
         problems.append(f"head must be a bare short sha: {vals.get('head')!r}")
     if not re.match(r"^\d+$", str(vals.get("dirty", ""))):
         problems.append(f"dirty must be a bare count: {vals.get('dirty')!r}")
+    c = vals.get("commits")
+    if c is not None and c != "" and not re.match(r"^\d+$", str(c)):
+        problems.append(f"commits must be a non-negative integer or absent: {c!r}")
     if vals.get("state") not in STATES:
         problems.append(f"state must be one of {STATES}: {vals.get('state')!r}")
     nxt = vals.get("next", "")
@@ -147,12 +175,24 @@ def validate(vals, root):
 
 
 def merged_into_main(root, head):
-    """True if head is an ancestor of origin/main (best-effort; None when unknowable)."""
+    """True if head is an ancestor of origin/main AND not origin/main itself (best-effort; None when unknowable).
+
+    A branch sitting at origin/main's tip with zero own commits is an ancestor of itself, so bare
+    --is-ancestor would flag a planning branch as merged. The `head != origin/main` check excludes
+    that: it is the defense-in-depth behind the `commits: 0` fast path, so check --dead stays
+    correct even when the commits field is wrong or absent."""
     try:
         subprocess.run(["git", "-C", root, "fetch", "-q"], capture_output=True, timeout=20)
         r = subprocess.run(["git", "-C", root, "merge-base", "--is-ancestor", head, "origin/main"], capture_output=True)
-        if r.returncode in (0, 1):
-            return r.returncode == 0
+        if r.returncode not in (0, 1):
+            return None
+        if r.returncode == 1:
+            return False
+        tip = subprocess.run(["git", "-C", root, "rev-parse", "origin/main"], capture_output=True, text=True)
+        head_full = subprocess.run(["git", "-C", root, "rev-parse", head], capture_output=True, text=True)
+        if tip.returncode or head_full.returncode:
+            return None
+        return head_full.stdout.strip() != tip.stdout.strip()
     except Exception:
         pass
     return None
@@ -165,7 +205,11 @@ def cmd_upsert(path, opts, dry):
     vals = {f: opts.get(f) for f in FIELDS}
     vals["slug"] = opts.get("slug")
     vals["updated"] = vals["updated"] or today
-    missing = [f for f in ["slug"] + FIELDS if not vals.get(f)]
+    if vals.get("commits") in (None, ""):
+        vals["commits"] = count_commits(repo_root(path), vals.get("head"))
+    if vals.get("commits") in (None, ""):
+        vals.pop("commits", None)
+    missing = [f for f in ["slug"] + FIELDS if f not in OPTIONAL_FIELDS and not vals.get(f)]
     if missing:
         die(f"missing: {', '.join('--' + m for m in missing)}")
     root = repo_root(path)
@@ -177,12 +221,15 @@ def cmd_upsert(path, opts, dry):
     if entries and not stamp:
         die(f"pointer is format 1 — run `migrate` first so the file does not end up mixed-format")
     others = [e for e in entries if e[0] != vals["slug"] and e[1].get("handoff") != vals["handoff"]]
-    new = render([(vals["slug"], vals, entry_lines(vals))] + others)
+    rendered = render([(vals["slug"], vals, entry_lines(vals))] + others)
     if dry:
-        print(new, end="")
+        print("would write at top:")
+        print("\n".join([f"## {vals['slug']}"] + entry_lines(vals)))
+        print(f"— {len(others)} other entries preserved; {len(entries) - len(others)} replaced")
     else:
-        write_atomic(path, new)
-    print(f"upserted {vals['slug']} at the top; {len(others)} other entries preserved; {len(entries) - len(others)} replaced")
+        write_atomic(path, rendered)
+    print(f"upserted {vals['slug']} at the top; {len(others)} other entries preserved; {len(entries) - len(others)} replaced"
+          + (f"; commits={vals.get('commits')}" if "commits" in vals else "; commits unknown (no local origin/main)"))
 
 
 def cmd_show(path, opts):
@@ -190,10 +237,16 @@ def cmd_show(path, opts):
     if not stamp:
         die(f"pointer is not format {FORMAT} — run `migrate` first", 1)
     sel = entries
+    scoped = opts.get("slug") or opts.get("branch")
     if opts.get("slug"):
         sel = [e for e in entries if e[0] == opts["slug"]]
     elif opts.get("branch"):
         sel = [e for e in entries if e[1].get("branch") == opts["branch"]]
+    if not scoped and not opts.get("all"):
+        # Compact list — one line per block — so listing every project is cheap, not a full JSON dump.
+        for s, f, _ in sel:
+            print(f"{s} | {f.get('branch', '?')} | {f.get('state', '?')} | commits={f.get('commits', '?')} | next: {f.get('next', '?')}")
+        sys.exit(0 if sel else 1)
     print(json.dumps([dict(slug=s, **f) for s, f, _ in sel], indent=1))
     sys.exit(0 if sel else 1)
 
@@ -222,6 +275,11 @@ def cmd_check(path, dead):
             except ValueError:
                 pass
         if dead and f.get("head") and f.get("state") not in ("done", "superseded"):
+            # commits: 0 means the branch has no commits of its own — it cannot have merged.
+            # Skip the fetch + merge-base entirely; this is the cheap signal that keeps
+            # planning branches off the dead list and out of the network round-trip.
+            if str(f.get("commits")) == "0":
+                continue
             m = merged_into_main(root, f["head"])
             if m:
                 problems.append(f"{slug}: dead — head {f['head']} is already in origin/main (state says {f.get('state')})")
@@ -293,16 +351,15 @@ def cmd_migrate(path, write):
             notes.append(f"{slug}: old status was {len(status)} chars — its content stays only in the handoff entry")
         out.append((slug, vals, entry_lines(vals)))
     new = render(out)
-    print(new)
     for n in notes:
         print("note:", n, file=sys.stderr)
     if write:
         bak = path + ".format1.bak"
         write_atomic(bak, text)
         write_atomic(path, new)
-        print(f"written; format-1 copy at {bak}", file=sys.stderr)
+        print(f"migrated {len(out)} blocks; format-1 copy at {bak}", file=sys.stderr)
     else:
-        print("dry run — pass --write to apply", file=sys.stderr)
+        print(f"would migrate {len(out)} blocks — {', '.join(s for s, _, _ in out) or 'none'}; pass --write to apply", file=sys.stderr)
 
 
 def main(argv):
@@ -311,11 +368,12 @@ def main(argv):
     sub = ap.add_subparsers(dest="cmd", required=True)
     up = sub.add_parser("upsert")
     for f in ["slug"] + FIELDS:
-        up.add_argument("--" + f, required=(f != "updated"))
+        up.add_argument("--" + f, required=f not in OPTIONAL_FIELDS)
     up.add_argument("--dry-run", action="store_true")
     sh = sub.add_parser("show")
     sh.add_argument("--slug")
     sh.add_argument("--branch")
+    sh.add_argument("--all", action="store_true", help="full JSON of every block (default without a filter is a compact list)")
     ck = sub.add_parser("check")
     ck.add_argument("--dead", action="store_true")
     rm = sub.add_parser("remove")
@@ -332,7 +390,7 @@ def main(argv):
     if a.cmd == "upsert":
         cmd_upsert(path, {k: v for k, v in vars(a).items() if k in ["slug"] + FIELDS}, a.dry_run)
     elif a.cmd == "show":
-        cmd_show(path, dict(slug=a.slug, branch=a.branch))
+        cmd_show(path, dict(slug=a.slug, branch=a.branch, all=getattr(a, "all", False)))
     elif a.cmd == "check":
         cmd_check(path, a.dead)
     elif a.cmd == "remove":

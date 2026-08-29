@@ -4,7 +4,7 @@ Read this only when `HANDOFF.md` exists and its first line is not `<!-- handoff-
 
 `<scripts>` is the `scripts/` directory beside the handoff `SKILL.md`.
 
-1. Tell the user in one line that the pointer is in the old format and you are converting it, keeping the original as `HANDOFF.md.format1.bak`.
+1. Tell the user in one line that the pointer is in the old format and you are converting it, keeping the original as `HANDOFF.md.format1.bak`. Migrated blocks get no `commits` field — the old pointer has no git state to compute it from — so pickup runs the merge check for them until the project's next `/handoff` adds it.
 2. Dry run: `python3 <scripts>/handoff-pointer.py <HANDOFF.md> migrate`. It prints the converted file and, on stderr, one note per problem it could not resolve. Show the user the block headings and the notes, nothing more — the converted blocks are mechanical.
 3. Apply: `python3 <scripts>/handoff-pointer.py <HANDOFF.md> migrate --write`.
 4. Resolve each note. The common ones:
