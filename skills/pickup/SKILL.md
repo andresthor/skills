@@ -10,7 +10,7 @@ description: >-
 argument-hint: "[project-slug] [--go — start the next step without asking]"
 allowed-tools: Bash(git *), Bash(gh pr view *), Bash(python3 *), Bash(bash *), Read, Glob, Grep, AskUserQuestion
 metadata:
-  version: 2.4.0
+  version: 2.4.1
 ---
 
 # Pickup
@@ -32,11 +32,11 @@ If the user's instructions declare a root for generated files, take that pointer
 
 Take the `entry` fields as the selected block; the `commits` value feeds the Step 3 fast path.
 
-Only once a block is selected, run `handoff-pointer.py <HANDOFF.md> check --dead`. It reports structural problems and, using `git merge-base --is-ancestor <head> origin/main` per block, any block whose work is already in main. A block with `commits: 0` is skipped by the dead check — a branch with no commits of its own cannot have merged, so a planning-only branch never lands on the dead list. Report dead blocks as `dead: <slug> (head in main since …)` and offer `handoff-pointer.py <HANDOFF.md> prune`; the user confirms before anything is removed. Run the dead check scoped to your concern — you selected one project; a dead *other* block is a one-line FYI, not an investigation.
+Once a block is selected, run `handoff-pointer.py <HANDOFF.md> check --dead` **only if the block's `commits` is not `0`** — a `commits: 0` planning branch has nothing that could have merged, so the dead check (and its fetch) is skipped entirely. That is the same fast path Step 3 describes; do not run the check there and skip it here too. When it does run, it reports structural problems and, using `git merge-base --is-ancestor <head> origin/main` per block, any block whose work is already in main. Report dead blocks as `dead: <slug> (head in main since …)` and offer `handoff-pointer.py <HANDOFF.md> prune`; the user confirms before anything is removed. A dead *other* block is a one-line FYI, not an investigation — you selected one project.
 
 ## Step 2 — read the handoff
 
-Open the file named by `handoff:`. Read the **top entry only** — stop at the first `---`. Older entries are history, not state; open one only if the top entry names it by date. Never open `*-archive.md`. Then read `decisions.md` in the same dir if present; standing decisions and traps live there, not in the entry.
+Open the file named by `handoff:`. Read the **top entry only** — stop at the first `---`. Older entries are history, not state; open one only if the top entry names it by date. Never open `*-archive.md`. Then read `decisions.md` in the same dir if present; standing decisions and traps live there, not in the entry. **Stop reading there.** The entry names supporting files (`plan.md`, `meta.md`, a `_paste/` tree) for the *next step*; do not open or `cat` them at pickup time — they are the implementation payload, and pre-loading them is what bloats a session before the user has said go. Name them in the orientation; read them when work starts.
 
 ## Step 3 — fingerprint check
 
@@ -72,6 +72,6 @@ Then ask whether to proceed. Let the user redirect before you touch anything.
 
 - Read-only until the user confirms — no edits, no commits, no branch changes. Pruning dead pointer blocks is the one write, and only on an explicit yes.
 - `--go`: start the proposed step without asking — only when passed this invocation, and only on the fast path or a full flow with zero drift. A branch mismatch, a merge, staleness, or any drift always stops for the user.
-- Before starting work, read what the entry points at: a `plan.md` in the project dir usually carries the detail the entry only names, and starting without it re-derives decisions already made.
+- Before starting work (after the user says go, not at pickup), read what the entry points at: a `plan.md` in the project dir usually carries the detail the entry only names, and starting without it re-derives decisions already made.
 - Trust the repo over the handoff when they conflict, and report the conflict rather than acting on the stale claim.
 - The pointer lists several projects; if the one the user wants isn't there, take the slug and open that project's handoff directly.
