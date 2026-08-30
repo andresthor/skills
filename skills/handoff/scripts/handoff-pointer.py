@@ -409,8 +409,12 @@ def cmd_locate(repo, slug, branch):
     if not hp:
         print("entry has no handoff: path", file=sys.stderr)
         return
-    full = os.path.realpath(os.path.join(repo, hp))
-    print(f"handoff\t{hp}\t{'exists' if os.path.exists(full) else 'MISSING'}\t{full}")
+    # The path to READ is the repo-relative one (joined to the repo root, symlink intact) —
+    # the Read tool and any repo-path hooks operate on the .context/... path, not the
+    # realpath-collapsed vault target. realpath is used only to test existence.
+    read_path = os.path.normpath(os.path.join(repo, hp))
+    real = os.path.realpath(read_path)
+    print(f"handoff\t{hp}\t{'exists' if os.path.exists(real) else 'MISSING'}\tread:{read_path}")
 
 
 def main(argv):

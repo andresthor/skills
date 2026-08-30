@@ -10,7 +10,7 @@ description: >-
 argument-hint: "[project-slug] [--go — start the next step without asking]"
 allowed-tools: Bash(git *), Bash(gh pr view *), Bash(python3 *), Bash(bash *), Read, Glob, Grep, AskUserQuestion
 metadata:
-  version: 2.4.1
+  version: 2.4.2
 ---
 
 # Pickup
@@ -23,7 +23,7 @@ The scripts live in the handoff skill: `../handoff/scripts/` relative to this fi
 
 ## Step 1 — find the pointer and select the entry
 
-If the user's instructions declare a root for generated files, take that pointer path from context; otherwise resolve pointer, entry, and handoff path in one call — `handoff-pointer.py locate [--slug <slug> | --branch <branch>]` (default branch: the current one). It prints three lines on success: `pointer <path> <format-line>`, `entry <slug> <fields…>`, and `handoff <repo-relative path> exists|MISSING <absolute>`. Do not hand-roll the lookup with `ls`/`readlink`/`head`/`show` — `locate` is the whole preamble.
+If the user's instructions declare a root for generated files, take that pointer path from context; otherwise resolve pointer, entry, and handoff path in one call — `handoff-pointer.py locate [--slug <slug> | --branch <branch>]` (default branch: the current one). It prints three lines on success: `pointer <path> <format-line>`, `entry <slug> <fields…>`, and `handoff <repo-relative path> exists|MISSING read:<repo-root-joined path>`. Read the handoff via the `read:` path — it keeps the `.context` symlink intact, where a realpath would collapse it to a vault target the Read tool rejects. Do not hand-roll the lookup with `ls`/`readlink`/`head`/`show` — `locate` is the whole preamble.
 
 - If it exits non-zero (no pointer), say so and ask which project to pick up; don't guess.
 - If the pointer line's format is not `<!-- handoff-format: 2 -->`, it was written by an older handoff. Read `../handoff/references/migrate.md` and follow it before continuing — it converts the file once, by you, and the user runs nothing.
