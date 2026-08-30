@@ -10,7 +10,7 @@ description: >-
 argument-hint: "[project-slug] [--next '<one action, ≤80 chars>'] [--close]"
 allowed-tools: Bash(git *), Bash(gh pr view *), Bash(mkdir *), Bash(python3 *), Bash(bash *), Read, Glob, Grep, Write, Edit, AskUserQuestion
 metadata:
-  version: 2.3.0
+  version: 2.4.0
 ---
 
 # Handoff
@@ -29,6 +29,7 @@ Four scripts ship with this skill under `scripts/` beside this file (the skill's
 | `handoff-lint.py <handoff.md> [--decisions decisions.md]` | checks the top entry against the limits below |
 | `handoff-rotate.py <handoff.md>` | archives old entries once the file passes 180 lines |
 | `handoff-pointer.py <HANDOFF.md> upsert\|check\|show\|remove\|prune\|migrate` | the only thing that writes the pointer |
+| `handoff-pointer.py locate [--repo <root>]` | finds the pointer (`.context/HANDOFF.md` else repo-root `HANDOFF.md`) and prints path + format line |
 
 If a script fails, report the error and stop — do not hand-edit around it. The mechanics these scripts own (renumbering, rotating, validating fields) are exactly the ones that went wrong when done by hand.
 
@@ -50,6 +51,8 @@ The handoff is project working material, not skill output, so it lives in a proj
 1. The user's instructions (including their local context file) declare where generated, non-committed working files go → the project dir goes under that root, the pointer beside it as `HANDOFF.md`.
 2. Else, `.context/` exists at the repo root → project dir `.context/projects/<YYYY-MM>/<NN-slug>/`, pointer `.context/HANDOFF.md`.
 3. Else, ask once where to save (with a structured question if your tool has one). If you cannot ask, fall back to a `handoff/` directory at the repo root for the project files and `HANDOFF.md` at the repo root for the pointer — two different names, because `handoff.md` and `HANDOFF.md` collide on case-insensitive filesystems. Say which paths you used.
+
+When a pointer already exists, find its path with one call — `handoff-pointer.py locate` — which checks `.context/HANDOFF.md` then the repo-root `HANDOFF.md` and prints the path and first line. Do not hand-roll the lookup with `ls`/`readlink`/`head`; `locate` is that step. The project dir is beside or under it per the order above.
 
 ## Step 2 — resolve the project folder
 

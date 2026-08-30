@@ -8,6 +8,7 @@ usage:
   handoff-pointer.py <HANDOFF.md> remove --slug S
   handoff-pointer.py <HANDOFF.md> prune  [--older-than DAYS] [--dry-run]   # drop done/superseded entries older than DAYS (default 14)
   handoff-pointer.py <HANDOFF.md> migrate [--write]                   # convert a format-1 pointer (## N + status:) to format 2
+  handoff-pointer.py locate [--repo <root>]                          # resolve the pointer the skills do (.context/HANDOFF.md else repo-root HANDOFF.md); print path + format
 
 Format 2:
   <!-- handoff-format: 2 -->
@@ -362,9 +363,29 @@ def cmd_migrate(path, write):
         print(f"would migrate {len(out)} blocks — {', '.join(s for s, _, _ in out) or 'none'}; pass --write to apply", file=sys.stderr)
 
 
+def cmd_locate(repo):
+    """Resolve the pointer the way handoff/pickup Step 1 do, so the model spends one call, not six.
+
+    A declared root in the user's instructions is case 1 and cannot be read by a script; this
+    handles the fallback chain: .context/HANDOFF.md, else HANDOFF.md at the repo root. Prints the
+    path and first line; exits 1 with the places it looked if none resolves, so the caller knows
+    whether to ask the user or run /handoff."""
+    if repo is None:
+        repo = os.getcwd()
+    tried = []
+    for cand in (os.path.join(repo, ".context", "HANDOFF.md"), os.path.join(repo, "HANDOFF.md")):
+        tried.append(cand)
+        if os.path.exists(cand):
+            first = open(cand).readline().strip()
+            print(f"{cand}\t{first}")
+            return
+    print(f"no pointer found; looked at: {'; '.join(tried)}", file=sys.stderr)
+    sys.exit(1)
+
+
 def main(argv):
     ap = argparse.ArgumentParser(prog="handoff-pointer", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("pointer", help="path to HANDOFF.md")
+    ap.add_argument("pointer", nargs="?", help="path to HANDOFF.md (omit for `locate`)")
     sub = ap.add_subparsers(dest="cmd", required=True)
     up = sub.add_parser("upsert")
     for f in ["slug"] + FIELDS:
@@ -383,8 +404,15 @@ def main(argv):
     pr.add_argument("--dry-run", action="store_true")
     mg = sub.add_parser("migrate")
     mg.add_argument("--write", action="store_true")
+    lo = sub.add_parser("locate", help="resolve the pointer from the repo root; print path + first line")
+    lo.add_argument("--repo", help="repo root to resolve from (default: cwd)")
     a = ap.parse_args(argv[1:])
+    if a.cmd == "locate":
+        cmd_locate(a.repo)
+        return 0
     path = a.pointer
+    if path is None:
+        die("missing pointer path (only `locate` takes none)")
     if a.cmd != "upsert" and not os.path.exists(path):
         die(f"no such file: {path}")
     if a.cmd == "upsert":
