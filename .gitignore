@@ -15,3 +15,10 @@ CLAUDE.local.md
 .vscode/
 *.swp
 
+# candidate skills not yet promoted to skills/
+in-review/
+
+# python bytecode from running the handoff scripts locally
+__pycache__/
+*.pyc
+

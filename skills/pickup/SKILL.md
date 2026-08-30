@@ -10,7 +10,7 @@ description: >-
 argument-hint: "[project-slug] [--go — start the next step without asking]"
 allowed-tools: Bash(git *), Bash(gh pr view *), Bash(python3 *), Bash(bash *), Read, Glob, Grep, AskUserQuestion
 metadata:
-  version: 2.2.0
+  version: 2.2.1
 ---
 
 # Pickup
@@ -30,9 +30,11 @@ If the pointer's first line is not `<!-- handoff-format: 2 -->`, it was written 
 Select the block with the script, never by reading the whole file:
 
 - A slug was passed → `handoff-pointer.py <HANDOFF.md> show --slug <slug>`.
-- Else → `show --branch "$(git rev-parse --abbrev-ref HEAD)"`. If nothing matches, `show` with no filter lists every block: name the slugs and ask which to pick up. If the branch matches more than one block, list them and ask.
+- Else → `show --branch "$(git rev-parse --abbrev-ref HEAD)"`. If the branch matches more than one block, list them and ask.
 
-Then run `handoff-pointer.py <HANDOFF.md> check --dead`. It reports structural problems and, using `git merge-base --is-ancestor <head> origin/main` per block, any block whose work is already in main. A block with `commits: 0` is skipped by the dead check — a branch with no commits of its own cannot have merged, so a planning-only branch never lands on the dead list. Report dead blocks as `dead: <slug> (head in main since …)` and offer `handoff-pointer.py <HANDOFF.md> prune`; the user confirms before anything is removed.
+If the selection is empty (no block for this slug or branch), **stop here** — do not run `check --dead`, do not investigate other blocks. The pointer has no entry for this project. List the slugs the pointer does hold (one compact `show`, no filter) and ask the user one of: pick an existing slug, open the project's handoff directly if a `handoff.md` exists for it under `.context/projects/`, or run `/handoff` to write a fresh pointer for the current branch. A dangling handoff (project dir exists, pointer block missing) is common after a botched migration or a stray `remove`; it is not a reason to audit the rest of the pointer.
+
+Only once a block is selected, run `handoff-pointer.py <HANDOFF.md> check --dead`. It reports structural problems and, using `git merge-base --is-ancestor <head> origin/main` per block, any block whose work is already in main. A block with `commits: 0` is skipped by the dead check — a branch with no commits of its own cannot have merged, so a planning-only branch never lands on the dead list. Report dead blocks as `dead: <slug> (head in main since …)` and offer `handoff-pointer.py <HANDOFF.md> prune`; the user confirms before anything is removed. Run the dead check scoped to your concern — you selected one project; a dead *other* block is a one-line FYI, not an investigation.
 
 ## Step 2 — read the handoff
 
