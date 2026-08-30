@@ -10,7 +10,7 @@ description: >-
 argument-hint: "[project-slug] [--next '<one action, ≤80 chars>'] [--close]"
 allowed-tools: Bash(git *), Bash(gh pr view *), Bash(mkdir *), Bash(python3 *), Bash(bash *), Read, Glob, Grep, Write, Edit, AskUserQuestion
 metadata:
-  version: 2.4.0
+  version: 2.5.0
 ---
 
 # Handoff
@@ -29,7 +29,7 @@ Four scripts ship with this skill under `scripts/` beside this file (the skill's
 | `handoff-lint.py <handoff.md> [--decisions decisions.md]` | checks the top entry against the limits below |
 | `handoff-rotate.py <handoff.md>` | archives old entries once the file passes 180 lines |
 | `handoff-pointer.py <HANDOFF.md> upsert\|check\|show\|remove\|prune\|migrate` | the only thing that writes the pointer |
-| `handoff-pointer.py locate [--repo <root>]` | finds the pointer (`.context/HANDOFF.md` else repo-root `HANDOFF.md`) and prints path + format line |
+| `handoff-pointer.py locate [--repo <root>] [--slug S \| --branch B]` | finds the pointer, selects the entry (default: current branch), resolves the handoff path — one call for the whole orient preamble |
 
 If a script fails, report the error and stop — do not hand-edit around it. The mechanics these scripts own (renumbering, rotating, validating fields) are exactly the ones that went wrong when done by hand.
 

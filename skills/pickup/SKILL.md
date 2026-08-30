@@ -10,7 +10,7 @@ description: >-
 argument-hint: "[project-slug] [--go — start the next step without asking]"
 allowed-tools: Bash(git *), Bash(gh pr view *), Bash(python3 *), Bash(bash *), Read, Glob, Grep, AskUserQuestion
 metadata:
-  version: 2.3.0
+  version: 2.4.0
 ---
 
 # Pickup
@@ -23,16 +23,14 @@ The scripts live in the handoff skill: `../handoff/scripts/` relative to this fi
 
 ## Step 1 — find the pointer and select the entry
 
-If the user's instructions declare a root for generated files, take that pointer path from context; otherwise resolve it with one call — `handoff-pointer.py locate` — which checks `.context/HANDOFF.md` then the repo-root `HANDOFF.md` and prints the path and its first line. If it exits non-zero, no pointer exists; say so and ask which project to pick up, don't guess. Do not hand-roll the lookup with `ls`/`readlink`/`head` — `locate` is that step.
+If the user's instructions declare a root for generated files, take that pointer path from context; otherwise resolve pointer, entry, and handoff path in one call — `handoff-pointer.py locate [--slug <slug> | --branch <branch>]` (default branch: the current one). It prints three lines on success: `pointer <path> <format-line>`, `entry <slug> <fields…>`, and `handoff <repo-relative path> exists|MISSING <absolute>`. Do not hand-roll the lookup with `ls`/`readlink`/`head`/`show` — `locate` is the whole preamble.
 
-If the pointer's first line is not `<!-- handoff-format: 2 -->`, it was written by an older handoff. Read `../handoff/references/migrate.md` and follow it before continuing — it converts the file once, by you, and the user runs nothing.
+- If it exits non-zero (no pointer), say so and ask which project to pick up; don't guess.
+- If the pointer line's format is not `<!-- handoff-format: 2 -->`, it was written by an older handoff. Read `../handoff/references/migrate.md` and follow it before continuing — it converts the file once, by you, and the user runs nothing.
+- If the pointer is found but no `entry` line follows (no block for this slug/branch), **stop** — do not run `check --dead`, do not investigate other blocks. The stderr names the slugs the pointer holds; offer to pick one, open the handoff directly if its file exists, or run `/handoff` to write a fresh pointer. A dangling handoff (project dir exists, pointer block missing) is common after a botched migration or a stray `remove`; it is not a reason to audit the rest of the pointer.
+- If the `handoff` line says `MISSING`, the entry points at a file that is gone — say so and offer to write a fresh pointer.
 
-Select the block with the script, never by reading the whole file:
-
-- A slug was passed → `handoff-pointer.py <HANDOFF.md> show --slug <slug>`.
-- Else → `show --branch "$(git rev-parse --abbrev-ref HEAD)"`. If the branch matches more than one block, list them and ask.
-
-If the selection is empty (no block for this slug or branch), **stop here** — do not run `check --dead`, do not investigate other blocks. The pointer has no entry for this project. List the slugs the pointer does hold (one compact `show`, no filter) and ask the user one of: pick an existing slug, open the project's handoff directly if a `handoff.md` exists for it under `.context/projects/`, or run `/handoff` to write a fresh pointer for the current branch. A dangling handoff (project dir exists, pointer block missing) is common after a botched migration or a stray `remove`; it is not a reason to audit the rest of the pointer.
+Take the `entry` fields as the selected block; the `commits` value feeds the Step 3 fast path.
 
 Only once a block is selected, run `handoff-pointer.py <HANDOFF.md> check --dead`. It reports structural problems and, using `git merge-base --is-ancestor <head> origin/main` per block, any block whose work is already in main. A block with `commits: 0` is skipped by the dead check — a branch with no commits of its own cannot have merged, so a planning-only branch never lands on the dead list. Report dead blocks as `dead: <slug> (head in main since …)` and offer `handoff-pointer.py <HANDOFF.md> prune`; the user confirms before anything is removed. Run the dead check scoped to your concern — you selected one project; a dead *other* block is a one-line FYI, not an investigation.
 

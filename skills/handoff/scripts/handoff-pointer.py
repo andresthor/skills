@@ -8,7 +8,7 @@ usage:
   handoff-pointer.py <HANDOFF.md> remove --slug S
   handoff-pointer.py <HANDOFF.md> prune  [--older-than DAYS] [--dry-run]   # drop done/superseded entries older than DAYS (default 14)
   handoff-pointer.py <HANDOFF.md> migrate [--write]                   # convert a format-1 pointer (## N + status:) to format 2
-  handoff-pointer.py locate [--repo <root>]                          # resolve the pointer the skills do (.context/HANDOFF.md else repo-root HANDOFF.md); print path + format
+  handoff-pointer.py locate [--repo <root>] [--slug S | --branch B]  # resolve pointer → entry → handoff path in one call (default branch: current)
 
 Format 2:
   <!-- handoff-format: 2 -->
@@ -363,24 +363,54 @@ def cmd_migrate(path, write):
         print(f"would migrate {len(out)} blocks — {', '.join(s for s, _, _ in out) or 'none'}; pass --write to apply", file=sys.stderr)
 
 
-def cmd_locate(repo):
-    """Resolve the pointer the way handoff/pickup Step 1 do, so the model spends one call, not six.
+def cmd_locate(repo, slug, branch):
+    """Resolve pointer → entry → handoff path in one call, so the model spends one call, not six.
 
     A declared root in the user's instructions is case 1 and cannot be read by a script; this
-    handles the fallback chain: .context/HANDOFF.md, else HANDOFF.md at the repo root. Prints the
-    path and first line; exits 1 with the places it looked if none resolves, so the caller knows
-    whether to ask the user or run /handoff."""
+    handles the fallback chain: .context/HANDOFF.md, else HANDOFF.md at the repo root. If a pointer
+    is found and is format 2, it then selects the entry by --slug or --branch (default: the
+    current branch) and, if matched, resolves the entry's handoff: path against the repo root and
+    reports whether it exists. Each step is gated on the last, so the line count scales with what
+    was found: pointer-only, pointer+entry, or pointer+entry+handoff. Exits 1 with the places it
+    looked if no pointer resolves."""
     if repo is None:
         repo = os.getcwd()
     tried = []
+    pointer = None
     for cand in (os.path.join(repo, ".context", "HANDOFF.md"), os.path.join(repo, "HANDOFF.md")):
         tried.append(cand)
         if os.path.exists(cand):
-            first = open(cand).readline().strip()
-            print(f"{cand}\t{first}")
-            return
-    print(f"no pointer found; looked at: {'; '.join(tried)}", file=sys.stderr)
-    sys.exit(1)
+            pointer = cand
+            break
+    if not pointer:
+        print(f"no pointer found; looked at: {'; '.join(tried)}", file=sys.stderr)
+        sys.exit(1)
+    first = open(pointer).readline().strip()
+    print(f"pointer\t{pointer}\t{first}")
+    if first != STAMP:
+        print("pointer is not format 2 — run `migrate` before selecting an entry", file=sys.stderr)
+        return
+    # Select the entry: --slug wins, else --branch, else the current branch.
+    sel_branch = branch
+    if slug is None and sel_branch is None:
+        sel_branch = subprocess.run(["git", "-C", repo, "rev-parse", "--abbrev-ref", "HEAD"],
+                                     capture_output=True, text=True).stdout.strip() or None
+    stamp, _, entries = parse(open(pointer).read())
+    sel = [e for e in entries if (slug and e[0] == slug) or (sel_branch and e[1].get("branch") == sel_branch)]
+    if not sel:
+        who = f"slug {slug!r}" if slug else f"branch {sel_branch!r}"
+        print(f"no entry for {who}; pointer has {len(entries)} blocks: {', '.join(e[0] for e in entries)}", file=sys.stderr)
+        return
+    e = sel[0]
+    s, f, _ = e
+    print(f"entry\t{s}\tbranch={f.get('branch','?')}\thead={f.get('head','?')}\tdirty={f.get('dirty','?')}\t"
+          f"commits={f.get('commits','?')}\tstate={f.get('state','?')}\tnext={f.get('next','?')}")
+    hp = f.get("handoff", "")
+    if not hp:
+        print("entry has no handoff: path", file=sys.stderr)
+        return
+    full = os.path.realpath(os.path.join(repo, hp))
+    print(f"handoff\t{hp}\t{'exists' if os.path.exists(full) else 'MISSING'}\t{full}")
 
 
 def main(argv):
@@ -406,9 +436,11 @@ def main(argv):
     mg.add_argument("--write", action="store_true")
     lo = sub.add_parser("locate", help="resolve the pointer from the repo root; print path + first line")
     lo.add_argument("--repo", help="repo root to resolve from (default: cwd)")
+    lo.add_argument("--slug", help="select the entry by slug (default: current branch)")
+    lo.add_argument("--branch", help="select the entry by branch")
     a = ap.parse_args(argv[1:])
     if a.cmd == "locate":
-        cmd_locate(a.repo)
+        cmd_locate(a.repo, a.slug, a.branch)
         return 0
     path = a.pointer
     if path is None:
