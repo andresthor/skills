@@ -10,7 +10,7 @@ description: >-
   me the plan first") to approve the setup before anything spawns.
 argument-hint: "[--gate] [free-text: what you're trying to do + the deliverable you want + any constraints or prior failures]"
 metadata:
-  version: 1.3.0
+  version: 1.3.1
 ---
 
 # orchestrate
@@ -71,6 +71,7 @@ Everything else — even if ambiguous — gets a sensible default, shown in the 
 ### 4 · Assemble the plan
 Build the plan from the skeleton in `assembly-templates.md` per the resolved config; pick the fan-out and collaboration presets, and for multi-stage work the phased **research → debate** shape (reach for a direct-comms **agent-team** only when the friction *between* agents is the point — both covered there). Then **inject the always-on layer regardless of what was asked** — this is where the quality lives:
 - the **plan file** — `orchestration-plan-<goal-slug>.md` in the run's working directory, registered as a named output under its resolved concrete name; drawn and written before anything spawns [step 6]
+- **agent output names** — no agent-written `.md` file may start with `report`, `summary`, `findings` or `analysis` (any case); Claude Code rejects those writes from subagents, pushing agents into shell workarounds or dumping the file into messages. Lead with the role or deliverable instead — `review-security.md`, `pricing-options.md`
 - no-veto + lead stripped of synthesis, whenever >1 agent [P5]
 - prevention cluster: scope-elimination [P11] + halt conditions + irreversible-action gate [P12, P7]
 - **role identities** — every agent carries a distinct role, never a generic label; agents that must address each other are named teammates, independent fan-out just labels the role in the prompt [always-on — see step 7]

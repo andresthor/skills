@@ -22,7 +22,7 @@ KEEP these (what worked, preserve):
 - <preserved win>
 
 ## Roster                                     [P5 — varies by D1/D3/D4]
-<role name> — scope: <…>; deliverable: <…>; output path: <…>; lifecycle: <active | idle-on-call>.
+<role name> — scope: <…>; deliverable: <…>; output path: <… — never a leading report/summary/findings/analysis>; lifecycle: <active | idle-on-call>.
 (repeat per role)
 
 ## Collaboration protocol                     [P5/P6 — D5]
