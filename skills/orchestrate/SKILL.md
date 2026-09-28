@@ -10,7 +10,7 @@ description: >-
   me the plan first") to approve the setup before anything spawns.
 argument-hint: "[--gate] [free-text: what you're trying to do + the deliverable you want + any constraints or prior failures]"
 metadata:
-  version: 1.3.1
+  version: 1.4.0
 ---
 
 # orchestrate
