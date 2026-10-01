@@ -1,27 +1,44 @@
 ---
 name: anchor
 description: >-
-  Distill the current conversation's hard-won mental models into a one-line-bullet cheat sheet the
-  user can skim to reload context fast ("cliff notes for executive-function loading"). Use whenever
-  the user says "anchor this", "add this to the cheat sheet", "write down these mental models",
-  "make me cliff notes", "capture this so I don't have to re-derive it", or after a long clarifying
-  discussion asks to save the understanding somewhere. Also reach for it when the user says a
-  concept finally clicked and they want it kept. With arguments, focus on the named topics; with no
-  arguments, judge what carried the most cognitive load in the recent conversation.
+  Distill the current conversation's hard-won mental model(s) it can be what you just discussed
+  or if no argument is given, the whole session context. When a topic is named, the named
+  argument only — into a one-line-bullet cheat sheet the user can skim to reload context fast
+  ("cliff notes for executive-function loading"). Use whenever the user says "anchor this", "add
+  this to the cheat sheet", "write down these mental models", "make me cliff notes", "capture
+  this so I don't have to re-derive it", or after a long clarifying discussion asks to save the
+  understanding somewhere. Also reach for it when the user says a concept finally clicked and
+  they want it kept. With arguments, focus on the named topics; with no arguments, judge what
+  carried the most cognitive load in the recent conversation.
 argument-hint: "[topics to anchor — omit to judge from the conversation]"
 metadata:
-  version: 1.0.0
+  version: 1.1.0
 ---
 
 # anchor
 
-Re-deriving a mental model that was already built once is expensive; skimming ten one-line bullets is cheap. Your job: capture the models built in this conversation so the *next* session — or the user walking into a meeting cold — can reload them in under a minute.
+Re-deriving a mental model that was already built once is expensive; skimming ten one-line bullets is cheap. Your job: capture the identified model (argument) or models built in this conversation so the *next* session — or the user walking into a meeting cold — can "reload" the concept or concepts in under a minute.
 
-This is NOT a summary of the conversation. It is a distillation of the **understanding** — the things that were confusing until they weren't.
+This is NOT a summary of the conversation. It is a distillation of the **understanding** of one or more concepts — the things that were confusing until they weren't.
 
 ## What to capture
 
-Scan the recent conversation for moments where clarity was expensive to reach:
+### INVARIANT — Argument sets the scope
+
+**Arguments set the scope.** If the user named a topic or pointed at a thing ("that diagram",
+"the yes/no path"), anchor **that argument only** — the unit is the argument, not the session.
+Do not widen to cover the session: other topics, today's facts (ids, dates, numbers,
+incidents), and who-said-what stay out **even when they feel load-bearing** — they belong in
+the project's fact/doc files, not here. The scan list below applies only to grounding the
+named argument.
+
+**Argument-scoped sheets are SHORT.** A named argument typically needs 1 section and 2–5
+bullets — if your draft exceeds that, you are smuggling in session material; cut it.
+
+### No argument given
+
+Only when NO argument is given: scan the recent conversation for moments where clarity was
+expensive to reach:
 
 - **Distinctions that resolved confusion** — "X and Y are two different moments, don't blend them". These are the highest-value anchors; if one distinction organizes everything else, lead the whole sheet with it.
 - **Cardinalities and mappings** — 1:1:1 relationships, what scales with what, which object multiplies. Confusion here is quiet and expensive.
@@ -32,7 +49,12 @@ Scan the recent conversation for moments where clarity was expensive to reach:
 
 Leave out: narrative, process, who-said-what, anything the user never stumbled on. If it was never confusing, it doesn't need an anchor.
 
-**With arguments** (`/anchor <topic or free text>`): treat them as the focus — anchor those topics, drawing on the whole conversation. **Without arguments**: use judgment per the list above.
+**Fresh-session test for every bullet:** would this line still be true — and still useful —
+in a new session on this same project, without today's context? A bullet naming session
+specifics (a teammate, an environment id, a probe result, a latency number) fails: that is a
+fact, not a model. Cut it, or move it to the project's fact file.
+
+**With arguments**: scope as above. **Without arguments** (only then): judge from the list.
 
 ## Where it goes
 
@@ -59,9 +81,10 @@ In a project directory there is exactly one `anchor.md`, so the merge target is 
 - **Bold the key term** in a bullet so a skimming eye catches it.
 - **Lead with the most organizing distinction** — the one bullet that makes the rest make sense.
 - Short `##` sections with plain names. A section is 2–6 bullets; more means split or prune.
-- Tiny ASCII fragments only when a shape genuinely beats words (a 3-line mapping, an arrow chain). No elaborate diagrams — those belong in the full docs, which the sheet can point to.
+- Tiny ASCII fragments only when a shape genuinely beats words (a 3-line mapping, an arrow chain). No elaborate diagrams — those belong in the full docs, which the sheet can point to. **The sheet may contain at most one ASCII fragment, at most 8 rendered lines.**
 - Plain words. No unexplained jargon: the sheet must work when the reader has ZERO context loaded — that's its entire job.
-- End with **Standing guardrails** when there are any don't-relitigate items.
+- **When the argument names a diagram** (the yes/no path, a flow): the diagram itself goes on the sheet as the section's body — surrounding bullets stay ≤ 4.
+- **Standing guardrails are FORBIDDEN in argument-scoped sheets** (they belong only to no-argument session scans). Never invent them for a named topic — the named topic absorbed no session guardrails.
 
 ## Example (shape, not content)
 
