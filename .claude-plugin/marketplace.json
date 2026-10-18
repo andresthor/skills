@@ -1,7 +1,8 @@
 {
   "name": "andresthor",
   "owner": {
-    "name": "Andres Thor Saemundsson"
+    "name": "Andres Thor Saemundsson",
+    "email": "andresthor@gmail.com"
   },
   "description": "Skills I find useful.",
   "plugins": [
