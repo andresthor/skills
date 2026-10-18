@@ -9,7 +9,7 @@ description: >-
 argument-hint: "[the claim or solution to verify]"
 allowed-tools: Read, Grep, Glob, Agent, AskUserQuestion
 metadata:
-  version: 1.0.0
+  version: 1.1.0
 ---
 
 # Verify It
@@ -30,9 +30,12 @@ Figure out what's being verified. There are two sources:
 Write down, in your own words, a crisp summary of:
 
 - **The claim** — what is being proposed as true or as the fix
-- **The reasoning** — why it's believed to be correct (root cause, mechanism, evidence)
-- **The concrete changes or actions** — files, commands, behavior changes
-- **Any factual claims** — specific functions, files, APIs, versions, behaviors the proposal asserts exist or behave a certain way
+- **The changes** — files, commands, behavior changes
+- **Factual claims** — the stated root cause, plus every file, function, API, version, or behavior the proposal asserts exists or behaves a certain way
+- **Evidence** — raw error messages, stack traces, logs, test output
+- **The argument** — why the proposer believes the evidence leads to the claim
+
+**Skip if trivial.** If the proposal is a one-line change with obvious correctness, say this skill is overkill and stop — unless the user invoked it explicitly, in which case run it anyway.
 
 **Print this summary, then keep going in the same turn.** Don't stop for approval, don't ask "does this look right?" — spawn the agents immediately after printing it. The summary earns its place by being on the record, not by gating anything: when a verdict comes back resting on a bad premise, this is what lets the user see *why* it went wrong instead of just distrusting the output.
 
@@ -44,15 +47,15 @@ One case does stop: if you can't paraphrase the proposal cleanly — it's too ta
 
 ## Step 2: Launch Two Subagents in Parallel
 
-In a single message, spawn both subagents (different harnesses call these sub-tasks, agents, or background workers — use whatever parallel delegation your tool offers). They work independently and must not see each other's output.
+In a single message, spawn both subagents (different harnesses call these sub-tasks, agents, or background workers — use whatever parallel delegation your tool offers). They work independently and must not see each other's output. Sequential spawning leaks the first agent's framing into the second's brief.
 
 If your environment cannot run subagents at all, do the two reviews yourself, sequentially — adversarial first, then grounding — and keep them independent: finish one review completely before starting the other, and don't let the first review's conclusions color the second.
 
-Brief both agents thoroughly — they haven't seen this conversation. Give each the full proposal summary from Step 1, the relevant file paths (so they can read source directly, not summaries), and any constraints the user has mentioned.
+Brief both agents thoroughly — they haven't seen this conversation. Give Agent A the full Step 1 summary; give Agent B everything except **the argument**, so it checks facts against evidence without being steered toward the proposer's conclusion. Give both the relevant file paths (so they can read source directly, not summaries), and any constraints the user has mentioned.
 
 Two instructions go in **both** briefs, verbatim in substance:
 
-- **Read only. Do not edit, write, or run anything that changes state.** An agent told to find problems, holding edit tools, drifts naturally toward fixing them — and a verification that mutates what it was verifying has destroyed the thing the user asked for. Findings are the deliverable; the fix is the user's call afterward.
+- **Read only. Do not edit, write, or run anything that changes state.** An agent told to find problems, holding edit tools, drifts naturally toward fixing them — and a verification that mutates what it was verifying has destroyed the thing the user asked for. Findings are the deliverable; the fix is the user's call afterward. If your harness lets you restrict a subagent's tools, give both read-only tools — the brief instruction stays either way.
 - **Return a short list, not an essay.** Findings ordered most severe first, one to two sentences each, with `path:line` evidence where a claim rests on code. No preamble, no restating the proposal back, no summary of what they were asked to do. If nothing turned up, say so in one line.
 
 That second instruction is what keeps Step 3 honest. Synthesis can't stay tight if it starts from two essays.
@@ -91,10 +94,12 @@ When both agents return, combine their findings into a short verdict for the use
 
 The verdict is one of:
 
-- **Holds up** — both agents came back clean, proceed with confidence
-- **Holds up with caveats** — minor issues flagged, listed below; decide whether to address
-- **Needs revision** — substantive problems found, the proposal should change before acting
-- **Wrong** — the proposal is based on a false premise or misidentified root cause
+- **Wrong** — a premise the fix depends on is false (root cause, a cited symbol, a described behavior)
+- **Needs revision** — the premise holds, but the fix leaves the bug, misses a case that matters, or breaks something
+- **Holds up with caveats** — only non-blocking findings remain (minor edge cases, a simpler alternative)
+- **Holds up** — nothing survived checking
+
+Pick the worst level any surviving finding earns.
 
 The shape:
 
@@ -118,12 +123,5 @@ Rules that keep it that size:
 - **One to two sentences per bullet.** Anything longer is a discussion, and a discussion belongs in the reply to a follow-up question, not in the verdict.
 - **Omit a section entirely when it found nothing.** A clean grounding check gets no heading — never write a paragraph explaining that there was nothing to write.
 - **Never paste agent output verbatim.** If the user wants the full text of a finding, they'll ask, and you still have it.
-- **Skip objections that turned out to be misunderstandings.** Report a resolved objection only when the resolution itself is worth the user knowing.
-
----
-
-## Notes
-
-- If the proposal is trivial (one-line change with obvious correctness), this skill is overkill — say so and skip it rather than burning agent cycles.
-- If the two agents disagree with each other (e.g., adversarial says "this is wrong because X", grounding says "X is actually true"), surface the disagreement to the user rather than picking a side.
-- The agents must be briefed in parallel in a single turn. Sequential spawning leaks information and defeats the independence.
+- **Check the evidence behind any finding that would move the verdict.** Open the cited `path:line` and confirm it shows what the agent claims. Drop a finding only when the code doesn't support it — never because you disagree with its reasoning. An uncited finding stays, marked *unverified*.
+- **If A and B contradict each other, surface it** rather than picking a side.
