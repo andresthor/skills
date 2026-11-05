@@ -1,125 +1,145 @@
 ---
 name: handoff
 description: >-
-  Capture the current work session as a handoff a fresh session, another agent, or a teammate can
-  resume from cold — state now, the next concrete step, open decisions, key paths — and register it
-  in a well-known pointer so pickup finds it with zero guessing. Use whenever work is being paused
-  or handed over, even if nobody says "handoff": wrapping up, running low on context, "I'm about to
-  clear/compact", "checkpoint this", "save state before I stop", "note where we are for next time",
-  "write a handoff", or closing out a finished project. Pair skill: pickup. Needs git and python3.
+  Capture the current work session so a fresh session, another agent, or a teammate can resume from cold — update the
+  project's living docs (state, decisions, notes) in place, append one short entry to the handoff log (what changed,
+  where it stopped), and register it in a well-known pointer so pickup finds it with zero guessing. Use whenever work is
+  being paused or handed over, even if nobody says "handoff": wrapping up, running low on context, "I'm about to
+  clear/compact", "checkpoint this", "save state before I stop", "note where we are for next time", "write a handoff",
+  or closing out a finished project. Pair skill: pickup. Needs git and python3.
 argument-hint: "[project-slug] [--next '<one action, ≤80 chars>'] [--close]"
-allowed-tools: Bash(git *), Bash(gh pr view *), Bash(mkdir *), Bash(python3 *), Bash(bash *), Read, Glob, Grep, Write, Edit, AskUserQuestion
+allowed-tools: Bash(git *), Bash(gh pr view *), Bash(mkdir *), Bash(cp *), Bash(mv *), Bash(python3 *), Bash(bash *), Read, Glob, Grep, Write, Edit, AskUserQuestion
 metadata:
-  version: 2.6.0
+  version: 3.0.0
 ---
 
 # Handoff
 
-Write down enough state that a fresh, low-context session can pick this work up without re-deriving anything. You produce two things: the **handoff entry** (in the project's running `handoff.md`) and a **pointer entry** (in the well-known `HANDOFF.md`) that tells pickup where the handoff is and what one thing to do next.
+Leave the project so that a fresh, low-context session can continue without re-deriving anything. Truth lives in the project's living docs, which you update in place. The handoff log gets one short entry that records what changed and where work stopped. The pointer tells pickup where all of it is.
 
-The next reader shares none of your context and pays for every character you write. The writer is always at the end of a session with everything in mind; the reader is always at the start of one with nothing. Write for the reader.
+The next reader shares none of your context and pays for every character you write. They also trust what you write. A question you invent or a next step you guess becomes their first task, and it carries forward. **Write nothing to fill a slot.** Every optional line is left out when there is nothing real to put in it.
+
+## The project docs
+
+Each project dir holds four primary docs, prefixed `00-`. Every one carries its own rules in its header, and those rules win over this skill where they are stricter.
+
+| file | holds | how it changes |
+|---|---|---|
+| `00-state.md` | current truth: aim, known, to verify, unknown, prior work | edited in place, never a history |
+| `00-decisions.md` | settled calls, one per line, tagged with who made them | edited in place, `[user]` lines only on the user's word |
+| `00-notes.md` | footguns, gotchas, process fixes | edited in place |
+| `00-handoff.md` | the session log, newest on top | appended, never edited, rotated to an archive |
+
+Everything else is a numbered doc or dir (`01-architecture.md`, `02-research/`): plans, rationale, research, reference. The `00-` docs point at them instead of repeating them. If the project dir has an `AGENTS.md`, read it before writing anything. The user owns it, so never edit it unless they tell you to.
+
+Fresh copies of all four, plus `AGENTS.md`, live in `templates/` beside this file.
 
 ## Scripts
 
-Four scripts ship with this skill under `scripts/` beside this file (the skill's base directory is announced when it loads). They are python3 stdlib and bash; they never commit, never touch git state, and never write outside the handoff files.
+Four scripts ship under `scripts/` beside this file (the skill's base directory is announced when it loads). They are python3 stdlib and bash. They never commit, never touch git state, and never write outside the handoff files (lint's `--snapshot` writes one file to the system temp dir).
 
 | script | does |
 |---|---|
-| `handoff-fingerprint.sh [repo]` | prints `{branch, head, dirty}` from git |
-| `handoff-lint.py <handoff.md> [--decisions decisions.md]` | checks the top entry against the limits below |
+| `handoff-fingerprint.sh [repo]` | prints `{branch, head, dirty, now, session}` from git, the clock and the environment |
+| `handoff-lint.py <project-dir>` | checks the top entry and the `00-` docs, splits findings into yours (errors) and pre-existing (warnings) |
 | `handoff-rotate.py <handoff.md>` | archives old entries once the file passes 180 lines |
 | `handoff-pointer.py <HANDOFF.md> upsert\|check\|show\|remove\|prune\|migrate` | the only thing that writes the pointer |
-| `handoff-pointer.py locate [--repo <root>] [--slug S \| --branch B]` | finds the pointer, selects the entry (default: current branch), resolves the handoff path — one call for the whole orient preamble |
+| `handoff-pointer.py locate [--repo <root>] [--slug S \| --branch B]` | finds the pointer, selects the entry, resolves the handoff path in one call |
 
-If a script fails, report the error and stop — do not hand-edit around it. The mechanics these scripts own (renumbering, rotating, validating fields) are exactly the ones that went wrong when done by hand.
+`session` is the first 8 characters of Claude Code's `CLAUDE_CODE_SESSION_ID`, a short id like a short SHA. It is absent under other agents, and everything that uses it then leaves it out. Never write a full session id.
 
-## What goes in — four tiers
-
-Handoffs are read by agents, not humans. Sort every fact before writing it:
-
-1. **Resume-critical** — state, the ordered next steps, open decisions, key paths, new watch-outs. This is the entry. Nothing else is.
-2. **Reference** — run records, SHA maps, validation history, rationale. Goes in `notes.md` in the project dir (create it if absent); the entry gets one line naming the file. Never pasted into the entry.
-3. **Dead** — superseded decisions, resolved blockers, stale SHAs. Not carried into the new entry. A standing "do not re-add X" is one line in `decisions.md` (Step 5), not narrative.
-4. **Fluff** — session narrative ("we did X, then found Y"), agent rosters and phase counts, tool failures, scratchpad paths, praise, restated context, anything in the first person. Never written.
+If a script fails, report the error and stop. Do not hand-edit around it.
 
 ---
 
 ## Step 1 — resolve where the handoff goes
 
-The handoff is project working material, not skill output, so it lives in a project dir. If a `.context/AGENTS.md` exists, follow it. Resolve the root in this order — pickup resolves the pointer in the same order, so the two stay in sync:
+The handoff is project working material, not skill output, so it lives in a project dir. If a `.context/AGENTS.md` exists, follow it. Resolve the root in this order (pickup resolves the pointer in the same order, so the two stay in sync):
 
-1. The user's instructions (including their local context file) declare where generated, non-committed working files go → the project dir goes under that root, the pointer beside it as `HANDOFF.md`.
+1. The user's instructions declare where generated, non-committed working files go → the project dir goes under that root, the pointer beside it as `HANDOFF.md`.
 2. Else, `.context/` exists at the repo root → project dir `.context/projects/<YYYY-MM>/<NN-slug>/`, pointer `.context/HANDOFF.md`.
-3. Else, ask once where to save (with a structured question if your tool has one). If you cannot ask, fall back to a `handoff/` directory at the repo root for the project files and `HANDOFF.md` at the repo root for the pointer — two different names, because `handoff.md` and `HANDOFF.md` collide on case-insensitive filesystems. Say which paths you used.
+3. Else, ask once where to save (with a structured question if your tool has one). If you cannot ask, use a `handoff/` dir at the repo root for the project and `HANDOFF.md` at the repo root for the pointer. Say which paths you used.
 
-When a pointer already exists, find its path with one call — `handoff-pointer.py locate` — which checks `.context/HANDOFF.md` then the repo-root `HANDOFF.md` and prints the path and first line. Do not hand-roll the lookup with `ls`/`readlink`/`head`; `locate` is that step. The project dir is beside or under it per the order above.
+When a pointer already exists, find it with one call: `handoff-pointer.py locate`. Do not hand-roll the lookup with `ls`/`readlink`/`head`.
 
-## Step 2 — resolve the project folder
+## Step 2 — resolve the project dir
 
 Project dirs are grouped by month and numbered within it: `projects/<YYYY-MM>/<NN-slug>/`.
 
 1. The user passed a slug → use it.
-2. Else, a project dir under any month already matches the current branch, or is clearly the active effort → **reuse it**, even across a month boundary. A dir whose top entry says the work was superseded or moved elsewhere is not the active effort — ask rather than resurrecting it.
-3. Else, derive a slug from the branch name: drop trailing issue ids, kebab-case, short. On `main`/`master` there is nothing to derive from — ask.
+2. Else, a project dir under any month already matches the current branch, or is clearly the active effort → **reuse it**, even across a month boundary. A dir whose top entry says the work was superseded or moved elsewhere is not the active effort. Ask rather than resurrecting it.
+3. Else, derive a slug from the branch name: drop trailing issue ids, kebab-case, short. On `main`/`master` there is nothing to derive from, so ask.
 
-Creating fresh: under the current month, next `NN` in that month (`01-` if empty). Slugs are lowercase kebab-case; the pointer script rejects anything else.
+Creating fresh: under the current month, next `NN` in that month (`01-` if empty). Slugs are lowercase kebab-case. Copy every file from `templates/` into the new dir and write a `CLAUDE.md` holding the single line `@AGENTS.md`, so Claude Code loads the rules too.
 
-## Step 3 — gather the state
+**An existing dir without `00-` docs** (an older `handoff.md` / `decisions.md` layout): ask once whether to adopt the `00-` layout. On yes, follow `references/migrate.md` §Project dir. On no, keep the existing file names and apply everything below to them.
 
-Read the real state; the conversation is not it:
+## Step 3 — read
 
-- `bash <scripts>/handoff-fingerprint.sh` — branch, head, dirty count. These go in the pointer verbatim.
-- `git log --oneline -5` and `git status --short` — what landed, what is uncommitted.
-- The top entry of the project's existing `handoff.md` and its `decisions.md`, if they exist — so the new entry continues the trail instead of repeating it. Do not read older entries; they are history, and each entry must stand alone.
+Read the real state. The conversation is not it.
 
-## Step 4 — write the handoff entry
+- `bash <scripts>/handoff-fingerprint.sh` gives branch, head, dirty, now and session. The first three go in the pointer verbatim. `now` and `session` stamp the entry and any decision you add.
+- `git log --oneline -5` and `git status --short` show what landed and what is uncommitted.
+- `AGENTS.md` and the four `00-` docs, so your edits fit what is already there.
 
-One running file per project, appended over time — not a file per session. If a handoff file already exists in the project dir (`handoff.md` or `NN-handoff.md`), keep its name; creating fresh, use `NN-handoff.md` if the dir uses `NN-` numbering, else `handoff.md`. The new entry goes on top, older entries stay below a `---` divider. On a fresh file, line 1 is a one-line note naming the discipline — `> Written in the style of the /handoff skill — one fact per line, one sentence max, no narrative. See skills/handoff/SKILL.md.` — followed by a blank line. It sits above the first heading, passes lint clean, and survives rotation; an agent editing the file mid-session without loading this skill reads it before adding a paragraph.
+Read the previous handoff entry for its heading only. **Never copy its lines forward.** An open question or a next step in an old entry was that session's guess. If it still matters, it lives in `00-state.md`, and the docs decide whether it does.
 
-**Limits.** An entry is at most 1,800 characters, no line over 160. One fact per line, at most one sentence. No `;`, no `·`, no inline `(1) … (2)` lists, at most one parenthetical, no em-dash except the label's own. A second clause is a second bullet, or it is cut. These are measured in characters because a line budget is met by unwrapping — the entry gets shorter in lines and longer in every way that matters. The lint in Step 6 counts; you do not have to.
+## Step 4 — update the living docs
 
-Use this template exactly — five labels, nothing added, no sub-headings. The values are placeholders showing the register; replace every one:
+Make the docs true. Follow each file's header rules:
 
-```markdown
-## Handoff 2026-08-27
-**State now** — feat-add-session-cache @ 3f9c2a1, tree clean, cache layer done, backfill script written but not yet run.
-**Next up**
-1. `npm run backfill -- --env staging`
-2. Compare row counts with the baseline in `notes.md`
-**Open decisions** — none
-**Key paths & commits**
-- `src/cache/session.ts` — cache layer
-- `3f9c2a1` — backfill script
-**Watch-outs** — none new
+- **`00-state.md`**: replace what changed. A resolved unknown becomes one known line plus a pointer to where the detail lives. Delete what stopped being true. Tag every fact with its source.
+- **`00-decisions.md`**: add a settled call only if it passes the scope gate below. Format `- [who] Decision. — <now> <session8>`, with `now` and `session` from the fingerprint. `<session8>` is left out when the fingerprint has no session.
+- **`00-notes.md`**: add a footgun only if a future session would otherwise step on it.
+- Anything longer than a line (rationale, research, run records, SHA maps) goes in a numbered doc, with one pointer line in the `00-` doc.
+
+**Open questions.** One goes under Unknown in `00-state.md` only if the user raised it or it blocks a concrete step. A question the docs already answer, or one that came from your own misreading, is not open. Leave it out.
+
+**Scope gate for decisions.** A line qualifies only if it records a settled call about the work: design, scope, process, don't-re-raise items. Never your own workflow or communication preferences, lessons from your own mistakes, or anything that belongs in the user's instruction files. A missing line costs one question. A junk line pollutes every future pickup.
+
+If this session reverses a decision recorded in **another** project's decisions file, mark that line `SUPERSEDED:` there with one clause on why.
+
+## Step 5 — append the handoff entry
+
+The entry is the session's line in the log: what changed and where work stopped. It is history, so it must still make sense after the living docs have moved on.
+
+````markdown
+## 2026-11-05 14:30 fcfb4818
+```diff
++ known: card not required for trial, verification is non-blocking
+- unknown: IP fingerprinting feasibility → 03-research/fingerprint.md
++ decided: tiered onboarding
+~ commits: 3f9c2a1..8e1d004
+stopped: dashboard spec half-drafted in 02-dashboards.md
+next: finish the dashboard spec
 ```
+````
 
-- **State now** — where things are, not how they got there: branch @ sha, tree clean or dirty, what exists on disk. One line. SHAs beyond the head go in Key paths.
-- **Next up** — numbered, 1–5 items. Item 1 is the one step a stranger runs first: a command, a slash-command, or `ask — <question>` when the next step is a decision. One action per item; later items may point at `plan.md`.
-- **Open decisions** — `none`, or up to 4 bullets with the options if known.
-- **Key paths & commits** — `path or sha — ≤6 words`, no sentences.
-- **Watch-outs** — `none new`, or up to 4 bullets that are new this session. Standing traps live in `decisions.md`; never re-type them here.
+- **Heading**: `## <now> <session8>`, both from the fingerprint, never from memory. `<session8>` is left out when the fingerprint has no session.
+- **Body**: one `diff` block and nothing else. The markers render coloured and leave no room for prose.
+- `+ <noun>: <fact>` added, `- <noun>: <fact>` removed or resolved, `~ <noun>: <fact>` changed. The noun is a short lowercase label (`known`, `unknown`, `decided`, `commits`, `explored`, `dropped`). The fact is a few words.
+- **Restate, never point at a `00-` doc.** Those change, so a pointer into them stops meaning anything. Point only at things that stay put: commits, numbered docs.
+- `stopped:` is required, exactly once: where work paused, as a fact.
+- `next:` is optional, at most once. Write it only when there is a real next step: one the user asked for, or the obvious continuation of half-done work. Never a question, never "optional …", never a placeholder.
+- Write the lines from what this session did, never from the previous entry. A session that changed nothing writes only `stopped:`.
+- One running file per project. If the dir already has `handoff.md` or `NN-handoff.md`, keep its name. New entries go on top, older entries stay below a `---` divider, and none is ever edited.
 
-The heading is the date only, `## Handoff YYYY-MM-DD`; a second entry the same day adds ` HH:MM`. The test is whether a stranger could start without asking you a question — and stop reading the moment they can. "Continue the migration" fails; "port `users` to the new schema in `db/migrations/004`, then run the backfill against staging" passes.
+## Step 6 — lint
 
-## Step 5 — update decisions.md
+`python3 <scripts>/handoff-lint.py <project-dir>`. It reports ownership in its last line.
 
-Standing decisions and standing watch-outs that outlive one session live in the project dir's `decisions.md`, not in entries. Shape: a flat bullet list, one decision per bullet, one physical line under 160 characters, no headings except the title, no nesting, no strikethrough, no "corrected by" trailers — edit in place or delete. Keep it under 40 lines; rationale longer than a line goes in `notes.md` with a one-line verdict here pointing at it. On a fresh file, line 1 is `> Written in the style of the /handoff skill — one decision per line, flat, no narrative. See skills/handoff/SKILL.md.` above the title, so a mid-session edit that never loaded this skill still keeps it flat.
-
-**Scope gate — decisions about the project, never about you.** A line qualifies only if it records a settled call about the work: design, scope, process, don't-re-raise items, ideally attributed. Never your own workflow or communication preferences, lessons from your own mistakes, or anything that belongs in the user's instruction files. A missing line costs one question; a junk line pollutes every future pickup.
-
-If this session reverses a decision recorded in **another** project's `decisions.md`, mark that line `SUPERSEDED:` there with one clause on why. That is maintaining the record, not clobbering another project.
-
-## Step 6 — lint the entry
-
-`python3 <scripts>/handoff-lint.py <handoff.md> --decisions <decisions.md>`. **Errors only** trigger a fix-and-re-run, at most twice; warnings never do — they are density signals, not failures, and chasing them is how a handoff burns a session. The tally line names which is which. When a line is too long or too dense, cut it or move the material to `notes.md` and leave one pointer line; do not split one thought into fragments to satisfy the counter. Warnings and any errors still standing are reported in Step 9.
+- **Errors are yours**: the entry, the line caps, and every doc line this session wrote (it knows them by the session id in a decision, or by the snapshot pickup took). Fix them and re-run, at most twice. Report any that still stand.
+- **Warnings are pre-existing.** Fix one only if you are editing that line anyway.
+- **A cap error (C1)** means a file passed the `<!-- max-lines: N -->` on its line 1. Trim first: merge duplicates, delete what stopped being true, move rationale to a numbered doc. If the project genuinely needs more room, ask the user to raise the cap. Never raise it yourself. Lint flags a changed cap line (C2) when pickup took a snapshot.
+- Cut or move material. Never split one thought into fragments to satisfy a counter.
 
 ## Step 7 — rotate
 
-`python3 <scripts>/handoff-rotate.py <handoff.md>`. Once the file passes 180 lines it moves every entry but the top two to the `-archive` sibling, verbatim and newest on top. Running it on a small file is a no-op, so run it every time. Never add a "see archive" line to the entry — pickup never reads archives.
+`python3 <scripts>/handoff-rotate.py <handoff.md>`. Once the file passes 180 lines, it moves every entry but the top two to the `-archive` sibling, verbatim and newest on top. Running it on a small file does nothing, so run it every time.
 
 ## Step 8 — write the pointer, last
 
-Only after the handoff file is final, so the pointer never names a half-written file. The pointer is a **locator, not a summary**: it tells pickup which entry is this project's, where the handoff file is, and the one action to take next. Everything else lives in the entry. It holds one block per active project, newest first:
+Only after the docs and the entry are final, so the pointer never names a half-written file. The pointer is a **locator, not a summary**. It holds one block per active project, newest first:
 
 ```markdown
 <!-- handoff-format: 2 -->
@@ -131,8 +151,8 @@ Only after the handoff file is final, so the pointer never names a half-written 
 - dirty: 0
 - commits: 2
 - state: in-progress
-- next: run the backfill against staging
-- handoff: .context/projects/2026-08/03-session-cache/handoff.md
+- next: finish the dashboard spec
+- handoff: .context/projects/2026-08/03-session-cache/00-handoff.md
 - updated: 2026-08-27
 ```
 
@@ -141,27 +161,29 @@ Write it with the script and nothing else:
 ```bash
 python3 <scripts>/handoff-pointer.py <HANDOFF.md> upsert --slug <slug> \
   --branch <from fingerprint> --head <from fingerprint> --dirty <from fingerprint> \
-  --state in-progress --next "<one action, ≤80 chars>" --handoff <path from Step 4, relative to the repo root>
+  --state in-progress [--next "<the entry's next: line>"] --handoff <path from Step 5, relative to the repo root>
 ```
 
-- `branch`, `head`, `dirty` are the fingerprint values exactly — no annotations, no merge notes, no file names. Pickup compares them byte-for-byte; anything appended breaks the comparison and belongs in the entry.
-- `commits` is the count of branch commits beyond `origin/main` at handoff time, computed by the script — do not pass it. `0` means the work is planning-only and lives in uncommitted docs; pickup skips the merge check for those, so a branch that has not diverged is never read as "merged." Absent (no local `origin/main`) means the script could not compute it and pickup falls back to the check.
-- `state` is one of `in-progress | blocked | review | done | parked | superseded`. `next` is one action, no `;`, never "optional …" — if the only remaining work is optional, the state is `done`.
-- The script moves this project's block to the top, preserves every other block byte-for-byte, and refuses a `handoff:` path that does not exist or is not a handoff file. If it refuses, fix the input; never edit `HANDOFF.md` by hand.
-- If `HANDOFF.md` exists and its first line is not `<!-- handoff-format: 2 -->`, stop and read `references/migrate.md` beside this file; it walks you through converting the pointer once. The user runs nothing.
-- **`--close`**: the project is finished (merged, superseded, nothing next). Write a terminal entry (`state: done`: what merged, where the report is, one don't-retry line), then `handoff-pointer.py <HANDOFF.md> remove --slug <slug>`. Its history stays in the project dir.
-- If a new session continues work on a branch that already has a pointer block, update that block — pickup resolves by branch and cannot tell two blocks on one branch apart.
+- `branch`, `head`, `dirty` are the fingerprint values exactly, with nothing appended. Pickup compares them byte for byte.
+- `--next` mirrors the entry's `next:` line and is left out when the entry has none. The block then has no `next:` field.
+- `commits` (branch commits beyond `origin/main`) is computed by the script, so do not pass it. `0` means planning-only work in uncommitted docs, and pickup skips the merge check for it.
+- `state` is one of `in-progress | blocked | review | done | parked | superseded`. If the only remaining work is optional, the state is `done`.
+- The script moves this project's block to the top, preserves every other block byte for byte, and refuses a `handoff:` path that does not exist. If it refuses, fix the input. Never edit `HANDOFF.md` by hand.
+- If `HANDOFF.md` exists and its first line is not `<!-- handoff-format: 2 -->`, stop and follow `references/migrate.md` §Pointer.
+- **`--close`**: the project is finished (merged, superseded, nothing next). Update `00-state.md` to say so, write a final entry whose `stopped:` says what merged or why it ended, then `handoff-pointer.py <HANDOFF.md> remove --slug <slug>`. The history stays in the project dir.
+- If a new session continues work on a branch that already has a pointer block, update that block. Pickup resolves by branch and cannot tell two blocks on one branch apart.
 
 ## Step 9 — confirm
 
-Tell the user: the slug, the paths written (handoff, decisions, archive if rotated, pointer), the `state:` and `next:` line, and `read: <n> chars entry / <n> chars decisions` so the cost of the next pickup is visible. List any lint findings still standing in one line each.
+Tell the user: the slug, the files written, the `state:` and `next:` (or "no next"), and `read: <n> chars across the 00- docs` so the cost of the next pickup is visible. List any lint errors still standing in one line each.
 
 ---
 
 ## Rules
 
-- Never commit; the roots this writes to are gitignored working material.
-- Never check out or change a branch; you only record the branch name.
-- Each entry stands alone: pickup reads only the top one, so nothing may depend on an older entry or an archive.
-- The pointer is written only by `handoff-pointer.py`, and only after the handoff file is final.
+- Never commit. The roots this writes to are gitignored working material.
+- Never check out or change a branch. You only record the branch name.
+- Never invent content for an optional line. No next step, no open question, no change → no line.
+- Never carry a line forward from an older entry. The docs are the memory, and the entry is the log.
+- The pointer is written only by `handoff-pointer.py`, and only after everything else is final.
 - A script failure is a stop, not a detour.

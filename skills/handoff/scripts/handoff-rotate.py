@@ -4,7 +4,7 @@
 usage: handoff-rotate.py <handoff.md> [--threshold 180] [--keep 2] [--force] [--dry-run] [--json]
 
 If the handoff file exceeds --threshold lines and holds more than --keep entries, every entry after the first --keep
-moves to the `-archive` sibling (`handoff-archive.md` / `NN-handoff-archive.md`), verbatim, newest on top — above whatever
+moves to the `-archive` sibling (`00-handoff-archive.md`, `handoff-archive.md`), verbatim, newest on top — above whatever
 the archive already holds. The preamble before the first entry stays in place. Running twice is a no-op.
 exit 0 rotated or nothing to do · 2 refused (no entries parsed)
 """
@@ -14,7 +14,8 @@ import os
 import re
 import sys
 
-HEADER_RE = re.compile(r"^## Handoff (\d{4}-\d{2}-\d{2})")
+# Matches both the current `## YYYY-MM-DD HH:MM` heading and the older `## Handoff YYYY-MM-DD`
+HEADER_RE = re.compile(r"^## (?:Handoff )?(\d{4}-\d{2}-\d{2})")
 ARCHIVE_PREAMBLE = "# Handoff archive\n\nCold storage. Entries verbatim, newest on top. Pickup never reads this file.\n\n---\n\n"
 
 

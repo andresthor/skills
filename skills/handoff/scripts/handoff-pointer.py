@@ -2,7 +2,7 @@
 """handoff-pointer: the only writer of the HANDOFF.md pointer file.
 
 usage:
-  handoff-pointer.py <HANDOFF.md> upsert --slug S --branch B --head H --dirty N --commits N --state STATE --next "…" --handoff PATH [--updated YYYY-MM-DD] [--dry-run]
+  handoff-pointer.py <HANDOFF.md> upsert --slug S --branch B --head H --dirty N --commits N --state STATE [--next "…"] --handoff PATH [--updated YYYY-MM-DD] [--dry-run]
   handoff-pointer.py <HANDOFF.md> show   [--slug S | --branch B] [--all]  # selected entry as JSON (compact list if no filter; --all for full JSON)
   handoff-pointer.py <HANDOFF.md> check  [--dead]                     # report problems; --dead also tests heads against origin/main
   handoff-pointer.py <HANDOFF.md> remove --slug S
@@ -20,8 +20,8 @@ Format 2:
   - dirty: <count of `git status --short` lines>
   - commits: <count of branch commits beyond origin/main; 0 = planning-only, uncommitted work>
   - state: in-progress | blocked | review | done | parked | superseded
-  - next: <one action, ≤80 chars, no ';'>
-  - handoff: <path to handoff.md or NN-handoff.md, relative to the repo root>
+  - next: <one action, ≤80 chars, no ';'>   (omitted when there is no real next step)
+  - handoff: <path to 00-handoff.md, handoff.md or NN-handoff.md, relative to the repo root>
   - updated: YYYY-MM-DD
 
 Guarantees: upsert replaces the entry with the same slug (or the same handoff path) and moves it to the top; every other entry
@@ -41,7 +41,8 @@ STAMP = f"<!-- handoff-format: {FORMAT} -->"
 # commits is optional on the CLI (computed from git if absent) but always written when known,
 # so it is a FIELDS entry that renders like the rest. It is NOT required by upsert's `missing` check.
 FIELDS = ["branch", "head", "dirty", "commits", "state", "next", "handoff", "updated"]
-OPTIONAL_FIELDS = {"commits", "updated"}
+# next is optional: a pointer must never force a next step that does not exist
+OPTIONAL_FIELDS = {"commits", "next", "updated"}
 STATES = ["in-progress", "blocked", "review", "done", "parked", "superseded"]
 NEXT_MAX = 80
 HEAD_RE = re.compile(r"^[0-9a-f]{7,40}$")
@@ -126,7 +127,7 @@ def render(entries):
 
 
 def entry_lines(vals):
-    # Optional fields (commits, updated) may be absent — a migrated block has no git state to
+    # Optional fields (commits, next, updated) may be absent — a migrated block has no git state to
     # compute commits from, so it is omitted rather than written as an empty line.
     return [f"- {f}: {vals[f]}" for f in FIELDS if f not in OPTIONAL_FIELDS or vals.get(f) not in (None, "")]
 
@@ -148,9 +149,9 @@ def validate(vals, root):
         problems.append(f"commits must be a non-negative integer or absent: {c!r}")
     if vals.get("state") not in STATES:
         problems.append(f"state must be one of {STATES}: {vals.get('state')!r}")
-    nxt = vals.get("next", "")
-    if not nxt or len(nxt) > NEXT_MAX or ";" in nxt or "\n" in nxt:
-        problems.append(f"next must be one action, 1–{NEXT_MAX} chars, no ';': {nxt!r} ({len(nxt)} chars)")
+    nxt = vals.get("next") or ""
+    if nxt and (len(nxt) > NEXT_MAX or ";" in nxt or "\n" in nxt):
+        problems.append(f"next must be one action, ≤{NEXT_MAX} chars, no ';': {nxt!r} ({len(nxt)} chars)")
     if re.search(r"\boptional\b", nxt, re.I):
         problems.append("next names optional work — if the only remaining work is optional, the state is done")
     hp = vals.get("handoff", "")
@@ -246,7 +247,7 @@ def cmd_show(path, opts):
     if not scoped and not opts.get("all"):
         # Compact list — one line per block — so listing every project is cheap, not a full JSON dump.
         for s, f, _ in sel:
-            print(f"{s} | {f.get('branch', '?')} | {f.get('state', '?')} | commits={f.get('commits', '?')} | next: {f.get('next', '?')}")
+            print(f"{s} | {f.get('branch', '?')} | {f.get('state', '?')} | commits={f.get('commits', '?')} | next: {f.get('next', '-')}")
         sys.exit(0 if sel else 1)
     print(json.dumps([dict(slug=s, **f) for s, f, _ in sel], indent=1))
     sys.exit(0 if sel else 1)
@@ -321,7 +322,7 @@ def cmd_prune(path, days, dry):
 
 def cmd_migrate(path, write):
     """Format 1 → 2. Old entries are `## N` with project/branch/head/dirty/status/handoff/updated, or the single-entry
-    `# Active handoff` shape. state is derived from the old status; next becomes a TODO — a status is not a next step."""
+    `# Active handoff` shape. state is derived from the old status; next is left out — a status is not a next step."""
     text = open(path).read()
     stamp, _, entries = parse(text)
     if stamp:
@@ -338,7 +339,7 @@ def cmd_migrate(path, write):
         state = ("superseded" if "SUPERSEDED" in up else "done" if re.search(r"\b(MERGED|COMPLETE|DONE|SHIPPED)\b", up)
                  else "blocked" if re.search(r"\b(BLOCKED|ON HOLD|PARKED)\b", up)
                  else "review" if re.search(r"\b(REVIEW|PR OPEN|AWAITING)\b", up) else "in-progress")
-        nxt = "TODO: set with handoff-pointer upsert (old status in the .format1.bak)"
+        nxt = ""
         branch = re.sub(r"\s.*$", "", f.get("branch", ""))
         head = re.match(r"[0-9a-f]+", f.get("head", "")) and re.match(r"[0-9a-f]+", f.get("head", "")).group(0) or ""
         dval = f.get("dirty", "")
@@ -404,7 +405,7 @@ def cmd_locate(repo, slug, branch):
     e = sel[0]
     s, f, _ = e
     print(f"entry\t{s}\tbranch={f.get('branch','?')}\thead={f.get('head','?')}\tdirty={f.get('dirty','?')}\t"
-          f"commits={f.get('commits','?')}\tstate={f.get('state','?')}\tnext={f.get('next','?')}")
+          f"commits={f.get('commits','?')}\tstate={f.get('state','?')}" + (f"\tnext={f['next']}" if f.get("next") else ""))
     hp = f.get("handoff", "")
     if not hp:
         print("entry has no handoff: path", file=sys.stderr)
