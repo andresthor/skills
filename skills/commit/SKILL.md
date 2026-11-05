@@ -4,17 +4,24 @@ description: >-
   Creates a Conventional Commit with smart staging and concise messages. Use this skill for EVERY git
   commit — whether the user asks to commit, you're wrapping up a task, or you're committing as part of
   a larger autonomous workflow. Never run git commit directly; always go through this skill.
-argument-hint: "[closes|resolves ISSUE-ID]"
-allowed-tools: Bash(git add *), Bash(git status *), Bash(git commit *), Bash(git diff *), Bash(git log *)
+argument-hint: "[repo-path] [closes|resolves ISSUE-ID]"
+allowed-tools: Bash(git rev-parse *), Bash(git -C * rev-parse *), Bash(git -C * status *), Bash(git -C * log *), Bash(git -C * diff *), Bash(git -C * add *), Bash(git -C * commit *)
 metadata:
-  version: 1.0.0
+  version: 1.1.0
 ---
 
 ## Context
 
-- Status: !`git status`
-- Branch: !`git branch --show-current`
-- Recent commits (style reference): !`git log --oneline -5 2>/dev/null || echo "(no commits yet - this will be the first)"`
+Find the repository before anything else, and never assume it is the directory the session started in — a subagent's session often starts in a plan dir or the main checkout while its edits live in a separate worktree.
+
+1. **Resolve the root** with one call, from the first source that applies:
+   - **A path argument was given** → `git -C <path> rev-parse --show-toplevel`.
+   - **You edited files this session** → `git -C <dir-of-an-edited-file> rev-parse --show-toplevel`, using the absolute path you wrote to. Skip edited files that aren't in any repo (plan notes, scratch files). If the rest resolve to more than one root, run Steps 1–5 once per root and say so.
+   - **You're coming in cold** → `git rev-parse --show-toplevel` from your own working directory.
+
+   If no source yields a root, report that no repository was found and stop. Never guess a tree.
+2. **Run every git command as `git -C <root> …`**, with the root written out as a literal absolute path — never computed inline with `$(…)`, never left to the current directory. `<root>` below always means that path.
+3. **Load the context** in one call: `git -C <root> status --short --branch && git -C <root> log --oneline -5`. The log is your style reference; it fails on a repo with no commits, which just means this is the first.
 
 ## Your task
 
@@ -23,14 +30,14 @@ Create a Conventional Commit for the current changes. Do not push without explic
 Classifying and describing the change well requires knowing the *actual* edits, not just the filenames `git status` lists. Get that knowledge the cheapest way that's accurate:
 
 - **You made these changes this session** → you already know them. Work from that; don't reload a diff you've effectively already seen. This is the common case and where re-reading wastes the most.
-- **You're coming in cold** (you don't actually know what changed) → read the diff yourself before classifying: `git diff HEAD` for everything, or `git diff HEAD -- <files>` to stay focused on a large changeset.
+- **You're coming in cold** (you don't actually know what changed) → read the diff yourself before classifying: `git -C <root> diff HEAD` for everything, or `git -C <root> diff HEAD -- <files>` to stay focused on a large changeset.
 
 The point is to read the diff exactly when you need it and not by reflex.
 
 ### Step 1: Stage
 
 - **Files already staged** → commit those as-is.
-- **Nothing staged** → stage only the files belonging to one logical change. Leave out anything unrelated (a stray build-config edit, an unconnected formatting tweak) and say what you left out and why. When in doubt, leave it out.
+- **Nothing staged** → stage only the files belonging to one logical change with `git -C <root> add <files>`. Leave out anything unrelated (a stray build-config edit, an unconnected formatting tweak) and say what you left out and why. When in doubt, leave it out.
 - **No changes at all** → report "No changes to commit" and stop.
 
 ### Step 2: Classify
@@ -58,7 +65,7 @@ From the diff content, decide:
 Pass the message with a heredoc:
 
 ```
-git commit -m "$(cat <<'EOF'
+git -C <root> commit -m "$(cat <<'EOF'
 subject line here
 
 - bullet only if it earns its place
@@ -68,8 +75,10 @@ EOF
 
 ### Step 5: Report
 
+Name the root and branch so a commit in the wrong tree is obvious at a glance.
+
 ```
-Committed as `<sha1-short-hash>`
+Committed as `<sha1-short-hash>` on `<branch>` in `<root>`
 
 <subject>
 
