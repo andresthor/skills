@@ -10,7 +10,7 @@ description: >-
   me the plan first") to approve the setup before anything spawns.
 argument-hint: "[--gate] [free-text: what you're trying to do + the deliverable you want + any constraints or prior failures]"
 metadata:
-  version: 1.4.0
+  version: 1.5.0
 ---
 
 # orchestrate
@@ -95,11 +95,11 @@ Before sizing anything, pick **how** the run executes. This forks on the run's *
 ### 6 · Draw the plan, echo the config, clear the gate, size the subagent run
 
 #### Draw the plan — unconditional
-**Every run draws its plan as an ASCII diagram and writes it to a file, whether or not the run is gated.** Drawing is not gating: a diagram is an artifact, a gate is a stop. The gate below decides whether you *wait*; it never decides whether you *draw*.
+**Every run draws its plan and writes it to a file, whether or not the run is gated.** Drawing is not gating: a diagram is an artifact, a gate is a stop. The gate below decides whether you *wait*; it never decides whether you *draw*.
 
-A diagram is the right medium because a plan is a **shape** — who runs, in what order, gated on what, what comes out the end — and prose conveys that badly. Draw the shape the run actually has; orchestrations come in shapes nobody has seen yet, so there is no template to fill in. **If the runtime has a skill for drawing ASCII diagrams, use it** — a dedicated one will pick a form and keep it legible better than a format spec bolted onto this skill. If there isn't one, just draw it; a plain, readable diagram beats a styled one.
+A diagram is the right medium because a plan is a **shape** — who runs, in what order, gated on what, what comes out the end — and prose conveys that badly. Draw the shape the run actually has; orchestrations come in shapes nobody has seen yet, so there is no template to fill in. **In chat, render the diagram as Mermaid when the runtime renders it** (Pi does) — a flowchart carries the shape cleanly. The plan file keeps an ASCII copy in a fenced code block so it stays readable in any context; if the runtime has a skill for drawing ASCII diagrams, use it for that. If Mermaid isn't rendered, just draw ASCII in chat too; a plain, readable diagram beats a styled one.
 
-Write the diagram to the plan file in the run's working directory, and render the same diagram in the chat. The file holds **three things and nothing else**: the goal as a heading, a one-line stats summary (fan-out · scale · placement · spend · what happens next), and the diagram in a fenced code block so it renders monospace. No rationale, no roster table, no closing summary — that material is chat-only, and the file is worthless the moment it becomes a document.
+Write the diagram to the plan file in the run's working directory, and render the same shape in chat. The file holds **three things and nothing else**: the goal as a heading, a one-line stats summary (fan-out · scale · placement · spend · what happens next), and the ASCII diagram in a fenced code block so it renders monospace. In chat, render that shape as a Mermaid diagram (Pi renders it inline). No rationale, no roster table, no closing summary — that material is chat-only, and the file is worthless the moment it becomes a document.
 
 **Name the file for the run, not for the skill.** It is `orchestration-plan-<goal-slug>.md`, where the slug is 2–4 lowercase hyphenated words naming *this* run's deliverable — `orchestration-plan-auth-migration-review.md`, `orchestration-plan-pricing-research.md`. A working directory is usually a project folder that outlives any one orchestration, so a fixed name quietly destroys the previous run's plan the moment a later, unrelated run lands in the same place. Resolve the name once during assembly and carry that exact string everywhere the plan is referenced — the execution brief, the named-output gates, the path you report back. The runner never re-derives it.
 
@@ -154,5 +154,5 @@ Deliver the result: the synthesized output (converge) or the set of artifacts wi
 - **Not an unguarded spender** — cheap runs go immediately; team/pipeline/uncapped runs confirm first; irreversible actions always gate.
 - **Not a gate that nobody asked for** — the approval *gate* fires when the user requests it or when cost triggers a confirmation, never as a default politeness round. The *diagram* is a separate thing and is never conditional.
 - **Never spawns undrawn** — every run draws its plan and writes its own plan file before the first agent exists. A run with no diagram is a bug, not a judgment call.
-- **Not a diagram format police** — the shape is mandatory, the styling is not; defer to an installed ASCII-diagram skill and never grade the output against a house template.
+- **Not a diagram format police** — the shape is mandatory, the styling is not; default to Mermaid in chat when the runtime renders it (Pi does), keep ASCII in the plan file, defer to an installed ASCII-diagram skill for the file, and never grade the output against a house template.
 - **Not project-coupled** — self-contained; carries its own pattern library.
