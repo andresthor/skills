@@ -1,0 +1,153 @@
+<!doctype html>
+<!--
+  be-clear HTML template. Copy this file, replace the {{PLACEHOLDERS}}, and delete this comment.
+
+  {{TITLE}}       Document title (technical name or short noun phrase)
+  {{SUMMARY}}     1–3 STE sentences: what this document is for and who reads it
+  {{LEVEL}}       strict | balanced | loose
+  {{DATE}}        YYYY-MM-DD
+  {{TOC}}         <li><a href="#s1"><span class="n">1</span>Section title</a></li> … one per section
+  {{CONTENT}}     The sections, built from the components below
+
+  Components:
+
+  <section id="s1">
+    <h2><span class="n">1</span>Section title</h2>
+    <p>Descriptive paragraph. One topic. Six sentences or fewer.</p>
+
+    <aside class="callout warning"><strong>Warning</strong><p>Command first. Then the risk.</p></aside>
+    <aside class="callout caution"><strong>Caution</strong><p>…</p></aside>
+    <aside class="callout note"><strong>Note</strong><p>…</p></aside>
+
+    <ol class="steps">
+      <li>Do one action.<span class="result">The result the reader sees.</span></li>
+    </ol>
+
+    <h3 id="s1-1">1.1 Subsection</h3>
+    <table><thead><tr><th>…</th></tr></thead><tbody><tr><td>…</td></tr></tbody></table>
+    <pre><code>verbatim code</code></pre>
+  </section>
+
+  Glossary (last section, when the document uses more than a few technical names):
+  <section id="glossary"><h2><span class="n">G</span>Glossary</h2>
+    <dl class="glossary"><dt>Term</dt><dd>One meaning, in STE.</dd></dl>
+  </section>
+
+  Put each callout immediately before the step or section it applies to.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<style>
+:root {
+  --bg: #fbfaf7; --surface: #ffffff; --ink: #1d1f23; --muted: #5f6570; --rule: #e3e0d8;
+  --accent: #1f5f8b; --accent-soft: #e6eff6;
+  --warn: #a4161a; --warn-soft: #fbeaea; --caution: #9a5b00; --caution-soft: #fdf3e1; --note: #2f6b4f; --note-soft: #e8f3ed;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15171a; --surface: #1c1f23; --ink: #e6e4df; --muted: #9aa0a9; --rule: #2e3238;
+    --accent: #7db4dc; --accent-soft: #1d2a35;
+    --warn: #f08a8c; --warn-soft: #351c1d; --caution: #e7b45e; --caution-soft: #33291a; --note: #7fc7a2; --note-soft: #1b2e25;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.65 var(--sans); -webkit-font-smoothing: antialiased; }
+.layout { display: grid; grid-template-columns: 17rem minmax(0, 46rem); gap: 3.5rem; justify-content: center; padding: 3rem 2rem 6rem; }
+
+nav.toc { position: sticky; top: 2rem; align-self: start; max-height: calc(100vh - 4rem); overflow-y: auto; font-size: .9rem; }
+nav.toc h2 { font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 .75rem; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; border-left: 2px solid var(--rule); }
+nav.toc a { display: flex; gap: .6rem; padding: .3rem .8rem; margin-left: -2px; border-left: 2px solid transparent; color: var(--muted); text-decoration: none; }
+nav.toc a:hover { color: var(--ink); }
+nav.toc a.active { color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+nav.toc .n, h2 .n { font-variant-numeric: tabular-nums; color: var(--accent); }
+
+header.doc { margin-bottom: 2.5rem; }
+header.doc .badge { display: inline-block; font: 600 .72rem/1 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); background: var(--accent-soft); padding: .4rem .6rem; border-radius: 4px; }
+header.doc h1 { font-size: 2.1rem; line-height: 1.2; letter-spacing: -.01em; margin: .9rem 0 .6rem; }
+header.doc .summary { font-size: 1.1rem; color: var(--muted); margin: 0; }
+header.doc .meta { margin-top: 1rem; font-size: .82rem; color: var(--muted); }
+
+section { margin-bottom: 3rem; }
+h2 { display: flex; gap: .8rem; align-items: baseline; font-size: 1.45rem; line-height: 1.3; margin: 0 0 1rem; padding-top: .5rem; border-top: 1px solid var(--rule); }
+h3 { font-size: 1.1rem; margin: 2rem 0 .6rem; }
+p { margin: 0 0 1rem; }
+a { color: var(--accent); }
+strong { font-weight: 650; }
+
+ol.steps { counter-reset: step; list-style: none; padding: 0; margin: 0 0 1.5rem; }
+ol.steps > li { counter-increment: step; position: relative; padding: .55rem 0 .55rem 2.9rem; border-bottom: 1px dashed var(--rule); }
+ol.steps > li:last-child { border-bottom: 0; }
+ol.steps > li::before { content: counter(step); position: absolute; left: 0; top: .5rem; width: 1.9rem; height: 1.9rem; border-radius: 50%; display: grid; place-items: center; font: 600 .85rem/1 var(--sans); color: var(--accent); background: var(--accent-soft); }
+ol.steps .result { display: block; color: var(--muted); font-size: .92rem; margin-top: .2rem; }
+
+.callout { border-left: 4px solid; border-radius: 0 6px 6px 0; padding: .8rem 1rem .1rem; margin: 0 0 1.25rem; }
+.callout > strong { display: block; font-size: .75rem; letter-spacing: .12em; text-transform: uppercase; margin-bottom: .3rem; }
+.callout.warning { border-color: var(--warn); background: var(--warn-soft); } .callout.warning > strong { color: var(--warn); }
+.callout.caution { border-color: var(--caution); background: var(--caution-soft); } .callout.caution > strong { color: var(--caution); }
+.callout.note { border-color: var(--note); background: var(--note-soft); } .callout.note > strong { color: var(--note); }
+
+table { width: 100%; border-collapse: collapse; margin: 0 0 1.5rem; font-size: .93rem; background: var(--surface); }
+th, td { text-align: left; vertical-align: top; padding: .55rem .75rem; border-bottom: 1px solid var(--rule); }
+th { font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+code { font: .88em/1.5 var(--mono); background: var(--accent-soft); padding: .1em .35em; border-radius: 3px; }
+pre { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 1rem; overflow-x: auto; margin: 0 0 1.5rem; }
+pre code { background: none; padding: 0; }
+
+dl.glossary { display: grid; grid-template-columns: max-content 1fr; gap: .5rem 1.5rem; margin: 0; }
+dl.glossary dt { font-weight: 650; }
+dl.glossary dd { margin: 0; color: var(--muted); }
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; gap: 1.5rem; padding: 1.5rem 1.25rem 4rem; }
+  nav.toc { position: static; max-height: none; border: 1px solid var(--rule); border-radius: 6px; padding: 1rem; background: var(--surface); }
+}
+@media print {
+  :root { --bg: #fff; --surface: #fff; }
+  nav.toc { display: none; }
+  .layout { display: block; padding: 0; }
+  section, .callout, ol.steps > li, table { break-inside: avoid; }
+  a { color: inherit; text-decoration: none; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="toc" aria-label="Contents">
+    <h2>Contents</h2>
+    <ol>
+      {{TOC}}
+    </ol>
+  </nav>
+  <main>
+    <header class="doc">
+      <span class="badge">ASD-STE100 · {{LEVEL}}</span>
+      <h1>{{TITLE}}</h1>
+      <p class="summary">{{SUMMARY}}</p>
+      <div class="meta">{{DATE}}</div>
+    </header>
+    {{CONTENT}}
+  </main>
+</div>
+<script>
+// Highlights the TOC entry of the section nearest the top of the viewport
+const links = [...document.querySelectorAll('nav.toc a')];
+const byId = new Map(links.map(a => [a.getAttribute('href').slice(1), a]));
+const observer = new IntersectionObserver(entries => {
+  for (const e of entries) {
+    if (!e.isIntersecting) continue;
+    links.forEach(a => a.classList.remove('active'));
+    byId.get(e.target.id)?.classList.add('active');
+  }
+}, { rootMargin: '0px 0px -70% 0px' });
+links[0]?.classList.add('active');
+document.querySelectorAll('main section[id]').forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
