@@ -15,7 +15,7 @@ description: >-
 argument-hint: "[repo-root] [check]"
 allowed-tools: Bash(sh *init-craft/scripts/*), Bash(git *), Read, Edit, Write
 metadata:
-  version: 1.1.0
+  version: 1.1.1
 ---
 
 # init-craft

@@ -5,6 +5,7 @@
 #   what:  <git-common-dir>/info/craft-worktree, applied by craft-provision (built-in list if absent)
 # stdin: JSON with `name` and `cwd`. stdout: the worktree path, alone. Everything else goes to stderr.
 # `name@ref` forks from <ref> when it resolves; otherwise the base is origin/HEAD, else HEAD.
+# `base_ref` and `branch` are not in the documented input; they are honoured when a caller sends them.
 # scripts/machine.sh --worktree-hook links this file into ~/.claude/hooks/ (never copy it: it finds
 # provision.sh relative to its own real path).
 set -u
@@ -18,10 +19,14 @@ fields=$(printf '%s' "$input" | node -e '
 let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
   let j = {}; try { j = JSON.parse(s); } catch {}
   const str = (v) => (typeof v === "string" && !v.includes("\n") ? v : "");
-  console.log(str(j.name)); console.log(str(j.cwd));
+  for (const k of ["name", "cwd", "repo_root", "base_ref", "branch"]) console.log(str(j[k]));
 });' 2>/dev/null) || die "cannot read the hook input"
-name=$(printf '%s\n' "$fields" | sed -n 1p)
-cwd=$(printf '%s\n' "$fields" | sed -n 2p)
+field() { printf '%s\n' "$fields" | sed -n "$1p"; }
+name=$(field 1)
+cwd=$(field 2)
+[ -n "$cwd" ] || cwd=$(field 3)
+want_base=$(field 4)
+branch=$(field 5)
 [ -n "$name" ] || die "no name in the hook input"
 [ -n "$cwd" ] || cwd=${CLAUDE_PROJECT_DIR:-$PWD}
 
@@ -40,6 +45,7 @@ case $name in
 esac
 # The name becomes one path segment under the root
 case $name in ''|.|..|*/*) die "unusable worktree name: $name" ;; esac
+[ -z "$want_base" ] || base=$want_base
 if [ -z "$base" ]; then
   if git -C "$main" rev-parse --verify --quiet origin/HEAD >/dev/null 2>&1; then base=origin/HEAD; else base=HEAD; fi
 fi
@@ -59,8 +65,14 @@ if [ -e "$dir" ]; then
   say "reusing $dir"
 else
   mkdir -p "$(dirname "$dir")" || die "cannot create $(dirname "$dir")"
-  # Detached: Claude Code never deletes the branch of a hook-made worktree, so none is created
-  git -C "$main" worktree add --detach "$dir" "$base" >&2 </dev/null || die "git worktree add failed"
+  if [ -n "$branch" ] && git -C "$main" show-ref --verify --quiet "refs/heads/$branch"; then
+    git -C "$main" worktree add "$dir" "$branch" >&2 </dev/null || die "git worktree add failed"
+  elif [ -n "$branch" ]; then
+    git -C "$main" worktree add -b "$branch" "$dir" "$base" >&2 </dev/null || die "git worktree add failed"
+  else
+    # Detached: Claude Code never deletes the branch of a hook-made worktree, so none is created
+    git -C "$main" worktree add --detach "$dir" "$base" >&2 </dev/null || die "git worktree add failed"
+  fi
 fi
 
 # The repo's post-checkout hook has already provisioned when it is installed and core.hooksPath
