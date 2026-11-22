@@ -10,17 +10,19 @@ description: >-
   to report. Use it for small changes too.
 ---
 
-<!-- fill, then delete this comment. The templates assume a TypeScript repo whose scripts are in `package.json`. Replace each placeholder everywhere it appears in the skill, its references and the review agent:
+<!-- fill, then delete this comment. The templates give examples for several languages (TypeScript, Python, Go, Rust); keep only the ones for this repo's language(s) and delete the others. Replace each placeholder everywhere it appears in the skill, its references and the review agent:
 - `{{repo}}`: the repo's short name, lowercase with hyphens. Example: acme-api
 - `{{what-the-code-runs-inside}}`: a noun phrase, read after "runs inside" and "the contracts of", for whatever loads, calls or hosts the code. Example: a long-lived server process that an orchestrator starts and stops
-- `{{gates}}`: one shell command that runs every gate; the templates supply the backticks. Example: pnpm check
-- `{{pinned-truth}}`: the path of the pinned copy of the dependency the code is written against; the templates supply the backticks. Example: node_modules/<host-package>/
+- `{{gates}}`: one shell command that runs every gate; the templates supply the backticks. Examples: pnpm check, make check, just check, tox
+- `{{pinned-truth}}`: the path of the pinned copy of the dependency the code is written against, where the package manager puts the version the lockfile names; the templates supply the backticks. Examples: node_modules/<host-package>/, .venv/lib/python3.x/site-packages/<package>/, vendor/<module>/ or the Go module cache, the crate's directory under ~/.cargo/registry/src/ or `cargo vendor` output, a vendored directory
 - Every other blank is a `fill:` comment that says what to write. Replace the comment with that text, or delete it where it says it may be deleted.
+- After filling, delete every example that belongs to a language this repo does not use: in the prose, in the code blocks and in `bin/craft-check.config.mjs`.
+- `bin/craft-check.mjs` and its test need Node 20 or later and nothing else, whatever the repo's language.
 - In the frontmatter `description`, replace "the repo's source, scripts or tests" with the real directories, and add the repo's main kinds of unit (handler, route, command, component) after it. -->
 
 # {{repo}}-craft
 
-How to write code here so it stays good while the repo changes under it. Formatting, import order and type strictness are checked by the formatter and `tsc`, and a few craft rules by `bin/craft-check.mjs`. <!-- fill: one sentence per further tool the gates run, e.g. "Unused code is checked by <tool>."; delete if none --> `{{gates}}` runs them all, and the pre-commit hook runs the gates on every commit. This file is the layer those tools cannot check, and the layer that must survive refactorings and dependency upgrades unaided.
+How to write code here so it stays good while the repo changes under it. Formatting, import order and type strictness are checked by <!-- fill: the formatter, linter and type checker the gates run, e.g. "the formatter and `tsc`", "`ruff` and `mypy`", "`gofmt` and `go vet`", "`rustfmt` and `clippy`" -->, and a few craft rules by `bin/craft-check.mjs`. <!-- fill: one sentence per further tool the gates run, e.g. "Unused code is checked by <tool>."; delete if none --> `{{gates}}` runs them all, and the pre-commit hook runs the gates on every commit. This file is the layer those tools cannot check, and the layer that must survive refactorings and dependency upgrades unaided.
 
 <!-- fill: one sentence on how work reaches this repo, if that shapes how code must be written (built step by step from a written plan; refactored often; young); delete if nothing special -->
 
@@ -28,7 +30,7 @@ Two rules follow, and everything below serves them:
 
 1. **Never trust a description written about the code or the dependency — a plan, a design note, a README and this file's past tense included.** Read the actual thing. Code already in the tree is evidence of what was needed; it is not precedent for how the next thing must look.
 2. **What the code is judged by, in priority order:**
-   - It keeps the contracts of {{what-the-code-runs-inside}}. <!-- fill: one sentence naming the two or three contracts whose breakage compiles, lints and fails later --> Most mistakes here compile, pass lint, and fail in a mode, an input or a shutdown nobody tried.
+   - It keeps the contracts of {{what-the-code-runs-inside}}. <!-- fill: one sentence naming the two or three contracts whose breakage passes every static check and fails later --> Most mistakes here pass the type checker and the linter, and fail in a mode, an input or a shutdown nobody tried.
    - A reader can use each piece without opening it.
    - It contains what the problem needs today and nothing else.
    - You understand every line you hand over.
@@ -76,14 +78,14 @@ State the interface first: what goes in, what comes out, what it promises. If th
 
 - The entry point wires things together. Each concern lives in its own module. Split logic from runtime wiring only when the logic has a contract of its own; a small unit is one file, tested through what it registers or exports.
 - Depend on the narrowest shape you use. It keeps tests small and survives upgrades.
-- Validate at the boundary, where data this repo did not produce comes in. <!-- fill: one sentence listing those edges, e.g. "Here that is request bodies, files on disk and the environment." --> Narrow `unknown` there; never cast. Trust your own types inside.
+- Validate at the boundary, where data this repo did not produce comes in. <!-- fill: one sentence listing those edges, e.g. "Here that is request bodies, files on disk and the environment." --> Hold the value as unchecked there and narrow or parse it into a known shape; never cast or convert it unchecked (`as` in TypeScript, `cast()` or `# type: ignore` in Python, an unchecked type assertion in Go, `unwrap()` on untrusted input in Rust). Trust your own types inside.
 - Throw errors that tell the reader what to do next.
-- Comments, per [references/comments.md](references/comments.md): none by default; one line when a reader would otherwise guess wrong or wonder why; `/** */` on exports whose signature leaves a caller's question open.
+- Comments, per [references/comments.md](references/comments.md): none by default; one line when a reader would otherwise guess wrong or wonder why; a doc comment (`/** */`, a docstring, `///`) on exports whose signature leaves a caller's question open.
 - Write the test in the same change, against the public interface, named for the property it protects.
 
 ### 4. Verify
 
-The gates are whatever scripts `package.json` defines when you run them; read it, do not recite it. At the time of writing, `{{gates}}` runs them all: run it from the repo root and read the whole output. The gates say nothing about runtime contracts; [references/checklist.md](references/checklist.md) has the standing checklist and the probes. For behaviour that only shows up in the running system, run it. <!-- fill: one sentence naming where the repo's docs keep the commands to start it, e.g. "`README.md` has the commands."; delete if there is nothing to start -->
+The gates are whatever <!-- fill: the place this repo defines its check commands, e.g. "the scripts in `package.json`", "the targets in the `Makefile`" or `justfile`, "the tool tables in `pyproject.toml`", "the jobs in `.github/workflows/ci.yml`" --> defines when you run them; read it, do not recite it. At the time of writing, `{{gates}}` runs them all: run it from the repo root and read the whole output. The gates say nothing about runtime contracts; [references/checklist.md](references/checklist.md) has the standing checklist and the probes. For behaviour that only shows up in the running system, run it. <!-- fill: one sentence naming where the repo's docs keep the commands to start it, e.g. "`README.md` has the commands."; delete if there is nothing to start -->
 
 Report which gates you ran and which runtime paths you did or did not exercise. "The suite passes; I did not exercise it in the running system" is a complete and useful statement. When something you need is out of reach, carry on and list what stayed unverified.
 
@@ -119,7 +121,7 @@ Be decisive where you have grounds, and open about where you do not.
 - a comment cites a document or a step id, restates code, records history, or is no longer true
 - a test cannot fail
 - a helper has one caller and hides nothing
-- an `any` or a cast can be replaced by the real type or a narrowing
+- an escape from the type checker (`any` or `as` in TypeScript, `Any` or `# type: ignore` in Python, an unchecked type assertion in Go) can be replaced by the real type or a narrowing
 - code exists only for a later change and nothing calls it
 
 **Say what you would do and ask first when:**

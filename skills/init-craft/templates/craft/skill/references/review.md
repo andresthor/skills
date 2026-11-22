@@ -11,7 +11,7 @@ For a diff, a branch, or a file someone asks you to assess. The order matters: a
 5. Probe what you doubt. A ten-line script that feeds the function or the entry point awkward input (a missing field, the wrong type, empty, very long, control characters, an unknown kind, the same call twice) settles more than reading does. Write it outside the repo and remove it afterwards.
 6. Where a claim depends on what the dependency does, read the copy pinned in `{{pinned-truth}}` and cite the file. Where it depends on tree state (what is declared, what exists, which branches carry what), read the tree — and say that you checked it, because it may have moved by the time anyone reads your review.
 
-When there is no diff, because you were given a file, a package or a scaffold, review it as it stands. Code with no caller yet cannot be judged on whether it should exist; judge whether the interface it promises is one you would want to be held to, and check `package.json` and `tsconfig.json` as part of the package.
+When there is no diff, because you were given a file, a package or a scaffold, review it as it stands. Code with no caller yet cannot be judged on whether it should exist; judge whether the interface it promises is one you would want to be held to, and check its manifest and tool configuration (`package.json` and `tsconfig.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`) as part of the package.
 
 ## Pass 1: should this exist, in this shape?
 
@@ -26,11 +26,11 @@ When there is no diff, because you were given a file, a package or a scaffold, r
 Work through the failure classes in [checklist.md](checklist.md) and check each that could apply. The classes are stable; for any mechanism detail, derive it from the pinned copies as the checklist says. One line per class; these apply to any codebase:
 
 - a value from outside the repo's own code (input, a file, the environment, a dependency's callback) cast instead of narrowed, with no defined outcome for the malformed case
-- a throw from code no handler calls through (listeners, stream events, timers, promise continuations), or a floating promise
+- a throw from code no handler calls through (listeners, stream events, timers, promise continuations, goroutines, threads), or async work nobody awaits
 - a failure returned through the channel its caller reads as success
 - state that outlives or underlives what it describes, or is restored without a shape check
 - a path that needs a person or a terminal, with no defined behaviour when there is none
-- a shape copied from an example along with its casts and error handling, or an import `package.json` does not declare
+- a shape copied from an example along with its casts and error handling, or an import the repo's manifest does not declare
 - a resource not released, or not released idempotently, on every exit path
 - untrusted text reaching a terminal, a page or a shell unsanitised
 - a secret echoed into an error, a log or a fixture
@@ -43,8 +43,8 @@ Work through the failure classes in [checklist.md](checklist.md) and check each 
 - Any predicate with a side effect, any helper that depends on its caller's state, any flag parameter that selects between behaviours?
 - Does every comment state something the code cannot? Is every comment still true after this change, including the ones the diff did not touch?
 - Would the test names, read alone, tell you what the code guarantees? Would each test fail if the code were wrong?
-- `any`, `as`, non-null `!`, `@ts-ignore`: each one present for a reason you can state?
-- Is there a rule here that a person has to remember and a compiler flag or a test could enforce instead? Recommend the flag or the test.
+- Every escape from the checker (`any`, `as`, non-null `!`, `@ts-ignore` in TypeScript; `Any`, `cast()`, `# type: ignore` in Python; an unchecked type assertion or `//nolint` in Go; `unwrap()`, `unsafe`, `#[allow]` in Rust): each one present for a reason you can state?
+- Is there a rule here that a person has to remember and a checker setting or a test could enforce instead? Recommend the flag or the test.
 
 ## Mechanical sweep
 
@@ -52,22 +52,24 @@ Work through the failure classes in [checklist.md](checklist.md) and check each 
 
 ### Checked mechanically
 
-<!-- fill: keep the lines whose rule `bin/craft-check.config.mjs` enables, add one line per rule the repo defines there, and one per guard test that exists (imports, layout, ignore files) -->
+<!-- fill: keep the lines whose rule `bin/craft-check.config.mjs` enables and whose language this repo has, add one line per rule the repo defines there, and one per guard test that exists (imports, layout, ignore files) -->
 
-- `empty-catch`: an empty `catch` block, or `.catch(() => {})`
-- `boundary-cast`: `JSON.parse(` or `.json(` cast to anything but `unknown`, on one line
+- `empty-catch` (JavaScript, TypeScript): an empty `catch` block, or `.catch(() => {})`
+- `boundary-cast` (JavaScript, TypeScript): `JSON.parse(` or `.json(` cast to anything but `unknown`, on one line
+- `empty-handler` (Python, Go): an `except` whose body is only `pass` or `...`, an `if err != nil` with an empty block, or `_ = err`, with no comment that says why
 - `doc-citation`: a comment citing a plan, research note or spike by its path
 - `step-id`: a comment or test name carrying one of the id shapes the config lists; none are built in, so delete this line until the repo lists its own
 - `build-history`: a comment recording history or unfinished work
 - `foreign-line-ref`: a comment pointing at a line in another codebase or in installed files
-- `test-name-citation`: a test name carrying a citation, build history or a foreign line reference
+- `test-name-citation`: a test name carrying a citation, build history or a foreign line reference; names are read from `test(…)`, `it(…)` and `describe(…)` calls, `def test_…`, `func Test…` and `t.Run(…)`, a `fn` under `#[test]`, and RSpec `it`, `describe` and `context`
 
 What is left needs a reviewer's eye; every hit needs a reason you can state, or it is a finding:
 
 - a commit line citing a plan, research note, spike, step or scenario id, or a private abbreviation; and the same in a comment or test name in a shape the rules above miss (`grep -nE 'research/|plan\.md|spike/'`, plus the id shapes this repo's plans use)
 - a tag or ignore comment that only quiets a checker, and an export only tests import whose test only reads its value
-- an `as` cast that is not a narrowing after a `typeof`/`in` check, above all after a helper that the craft-check pattern does not see, or a boundary cast split across lines or made through a variable
-- an empty `catch` whose braces sit on separate lines
+- a cast or unchecked conversion that does not follow a check of the value (`as` without a `typeof`/`in` guard in TypeScript, `cast()` without an `isinstance` in Python, a type assertion without the `ok` in Go, `unwrap()` on input in Rust), above all after a helper that the craft-check pattern does not see, or a boundary cast split across lines or made through a variable
+- a swallowed error in a shape the rules miss: an empty `catch` whose braces sit on separate lines, a `rescue` with an empty body, `|| true`, `let _ =` on a `Result`
+- a citation or build history in a Python docstring: the comment rules read `//`, `/* */` and `#` comments, and a docstring is a string to them
 - an optional field production always passes, a field nobody reads, a return value every caller drops, code for a later change
 - a commit that cites something outside the repo, or a `refactor` whose output changed
 

@@ -251,6 +251,7 @@ chk_file_excluded() { # rel path in repo
 }
 
 chk_git_hook_installed() { # hook names; shims live in <common>/hooks and only run when core.hooksPath is unset
+  tracked "$repo" bin/hooks/pre-commit || tracked "$repo" bin/hooks/commit-msg || return 2 # no gate to run
   [ -z "$HOOKS_PATH" ] || return 1
   for h in "$@"; do
     [ -f "$common/hooks/$h" ] && [ -x "$common/hooks/$h" ] || return 1
@@ -491,13 +492,15 @@ done
 # 5. gates
 pc=bin/hooks/pre-commit
 if tracked "$repo" "$pc"; then
-  body=$(cat "$repo/$pc" 2>/dev/null)
-  if printf '%s\n' "$body" | grep -Eq 'typecheck|tsc'; then emit ok gates "$pc runs typecheck"
-  else emit fail gates "$pc does not run typecheck/tsc"; fi
-  if printf '%s\n' "$body" | sed 's/typecheck//g' | grep -Eq 'check|lint'; then emit ok gates "$pc runs check/lint"
-  else emit fail gates "$pc does not run check/lint"; fi
+  # a gate is whatever the repo runs; only an empty one is wrong
+  if grep -Ev '^[[:space:]]*(#|$)' "$repo/$pc" 2>/dev/null | grep -q .; then emit ok gates "tracked $pc"
+  else emit fail gates "$pc has no commands"; fi
+  if [ -f "$repo/tsconfig.json" ]; then
+    if grep -Eq 'typecheck|tsc' "$repo/$pc"; then emit ok gates "$pc runs typecheck"
+    else emit warn gates "$pc does not run typecheck/tsc in a TypeScript repo"; fi
+  fi
 else
-  emit fail gates "no tracked $pc (typecheck + check/lint gate missing)"
+  emit warn gates "no tracked $pc: commits in this repo are not checked"
 fi
 if tracked "$repo" bin/hooks/commit-msg; then emit ok gates "tracked bin/hooks/commit-msg"
 elif tracked "$repo" bin/commit-msg; then emit ok gates "tracked bin/commit-msg (move to bin/hooks/commit-msg)"
@@ -599,9 +602,9 @@ for wt in $WT_ALL; do
     if [ -e "$wt/$s" ] || [ -L "$wt/$s" ]; then tracked "$wt" "$s" || stray=$stray$s$nl; fi
   done
   [ -n "$stray" ] && emit warn worktrees "$nm stray untracked root files: $(join "$stray") (copies of .claude content?)"
-  lock=0
-  for lf in pnpm-lock.yaml package-lock.json yarn.lock bun.lock bun.lockb; do [ -f "$wt/$lf" ] && lock=1; done
-  if [ "$lock" = 1 ] && [ ! -d "$wt/node_modules" ]; then emit warn worktrees "$nm node_modules missing; fix: provision.sh --install-only"; fi
+  wpm=$(sh "$SKILL/scripts/provision.sh" --detect "$wt")
+  case $wpm in '') depdir='' ;; uv) depdir=.venv ;; *) depdir=node_modules ;; esac
+  if [ -n "$depdir" ] && [ ! -d "$wt/$depdir" ]; then emit warn worktrees "$nm $depdir missing; fix: provision.sh --install-only"; fi
   if [ -n "$symlinks" ]; then
     set +f
     # shellcheck disable=SC2086
@@ -693,11 +696,7 @@ fi
 # 12. tooling
 if command -v node >/dev/null 2>&1; then emit ok tooling "node $(node --version 2>/dev/null)"
 else emit fail tooling "node not on PATH"; fi
-pm=''
-if [ -f "$repo/pnpm-lock.yaml" ]; then pm=pnpm
-elif [ -f "$repo/package-lock.json" ]; then pm=npm
-elif [ -f "$repo/yarn.lock" ]; then pm=yarn
-elif [ -f "$repo/bun.lock" ] || [ -f "$repo/bun.lockb" ]; then pm=bun; fi
+pm=$(sh "$SKILL/scripts/provision.sh" --detect "$repo")
 if [ -n "$pm" ]; then
   if command -v "$pm" >/dev/null 2>&1; then emit ok tooling "$pm available (matches lockfile)"
   else emit fail tooling "$pm not on PATH but the repo's lockfile needs it"; fi

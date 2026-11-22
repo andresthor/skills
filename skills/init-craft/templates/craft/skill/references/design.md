@@ -2,6 +2,8 @@
 
 How to decide where a function boundary goes, when to share code, and when to leave working code alone. The examples are invented for illustration. They are not descriptions of code in the repo, and nothing in the repo is endorsed by appearing similar.
 
+<!-- fill: rewrite each code block in this file in the repo's main language, keeping what it shows, and in a repo whose language has no static types (Ruby, shell) delete the bullets under Types that only a type checker can hold; then delete this comment -->
+
 ## Contents
 
 - [The one test](#the-one-test)
@@ -83,15 +85,15 @@ Two uses are necessary, not sufficient. Ask what kind of code it is:
 
 | Repeated code is… | Example | Share it? |
 | --- | --- | --- |
-| Mechanical plumbing, identical by nature | narrowing an `unknown` to an object, writing a line to stderr, escaping text for one output format, truncation notices, resolving a path argument, a severity union | Yes, at the second use |
+| Mechanical plumbing, identical by nature | narrowing an unchecked value to an object, writing a line to stderr, escaping text for one output format, truncation notices, resolving a path argument, a severity type | Yes, at the second use |
 | Domain behaviour that happens to look alike today | how the live view and the replay each turn an event into a row | Probably not; they will diverge |
 | Similar by coincidence | two schemas that both have `path` and `limit` | No |
 
 The question that separates the rows: **will these cases need to change independently?** If a change to one should not automatically change the other, they are not the same thing, and sharing them turns every future edit into a negotiation.
 
-Prefer deriving a value over keeping two in step. A list of names kept beside the type that declares them will drift; derive one from the other, or check them against each other once. A count declared at the top and items added below will drift too: compute it from what was added, and take a size from the value itself (`buffer.byteLength`) instead of a number kept beside it.
+Prefer deriving a value over keeping two in step. A list of names kept beside the type that declares them will drift; derive one from the other, or check them against each other once. A count declared at the top and items added below will drift too: compute it from what was added, and take a size from the value itself (`buffer.byteLength`, `len(buf)`) instead of a number kept beside it.
 
-One copy of a rule, not two that agree today. Two parsers of the same environment variable, two clock types, two severity unions: one of them is wrong after the next change.
+One copy of a rule, not two that agree today. Two parsers of the same environment variable, two clock types, two severity types: one of them is wrong after the next change.
 
 ## Undoing a wrong abstraction
 
@@ -113,7 +115,7 @@ A couple of conditionals in shared code can be a fair way to learn what varies. 
 ## Build for the problem you have
 
 - No option, parameter, generic or config key without a caller that uses it today.
-- No fallback for a case you cannot name. A `catch` that swallows and continues hides the bug it was meant to handle.
+- No fallback for a case you cannot name. A handler that swallows and continues (an empty `catch`, `except: pass`, a discarded `err`) hides the bug it was meant to handle.
 - No compatibility shim for an interface with no consumers. Where there is a consumer (another repo, a deployed client, stored data), the shim is real work and needs a test.
 - **Nothing for a later change.** No state nothing produces, no mode no caller selects, no hook that does nothing yet, no error constructor nobody throws. However certain the later change is, the code it needs comes with it, shaped by its real caller.
 - **Whatever this repo adds is paid for where it runs.** On a hot path, at startup, in every call: a feature has to earn its place there as well as in the code. <!-- fill: one sentence on what the cost is in this repo (latency on a hot path, startup time, bundle size, prompt size) -->
@@ -123,15 +125,15 @@ A roadmap invites the opposite: what is coming is known, so writing it early loo
 
 ## Types
 
-- `unknown` for a value you pass through or have not yet checked; narrow before use. `any` switches the checker off for everything it touches.
-- No `as` to silence an error. A cast is a claim that the compiler cannot verify, so it needs the reason next to it when the reason is not obvious. At a boundary (input from outside, a dependency's callback payload, a file) a cast is never right: the value is untrusted and the cast is how a malformed one reaches the rest of the system. Narrow it. Casting the same value at every use means its type is not wired through; fix that once.
-- No `@ts-ignore`. `@ts-expect-error` on a single expression with a comment, in tests, when the point is to pass something invalid.
-- Derive, do not restate: the type a schema infers for a validated shape, the dependency's own types for what it defines, `typeof import("…")` for a module's shape, `Parameters<…>` for a callback. A hand-copied type is a second source of truth.
-- Depend on the narrowest shape you use. A function that calls two methods of a large object should ask for those two; its test then needs a two-line stub and no runtime. Narrow the shape, not the types inside it: an id stays `UserId`, not `string`.
-- Unions in one position before overloads; optional trailing parameters before overloads that differ only in arity.
+- The checked "not yet known" type for a value you pass through or have not yet checked (`unknown` in TypeScript, `object` in Python, `any` in Go, `serde_json::Value` in Rust); narrow before use. The unchecked one (`any` in TypeScript, `Any` in Python) switches the checker off for everything it touches.
+- No cast or unchecked conversion to silence an error (`as` in TypeScript, `cast()` or `# type: ignore` in Python, an unchecked type assertion in Go, `unwrap()` on untrusted input in Rust). A cast is a claim that the checker cannot verify, so it needs the reason next to it when the reason is not obvious. At a boundary (input from outside, a dependency's callback payload, a file) a cast is never right: the value is untrusted and the cast is how a malformed one reaches the rest of the system. Narrow it. Casting the same value at every use means its type is not wired through; fix that once.
+- No blanket suppression of the checker (`@ts-ignore`, a bare `# type: ignore`, a bare `//nolint`, a module-wide `#![allow]`). The narrowest form the language has (`@ts-expect-error`, `# type: ignore[code]`, `//nolint:rule`, `#[expect(lint)]`) on a single expression with a comment, in tests, when the point is to pass something invalid.
+- Derive, do not restate: the type a schema infers for a validated shape, the dependency's own types for what it defines, and a type computed from the thing it describes where the language can (`typeof import("…")` and `Parameters<…>` in TypeScript, `ParamSpec` in Python, an associated type in Rust). A hand-copied type is a second source of truth.
+- Depend on the narrowest shape you use. A function that calls two methods of a large object should ask for those two (a structural type, a `Protocol`, a small interface or trait); its test then needs a two-line stub and no runtime. Narrow the shape, not the types inside it: an id stays `UserId`, not `string`.
+- Where the language has overloads: unions in one position before overloads; optional trailing parameters before overloads that differ only in arity.
 - A callback parameter is optional only if the callback may really be invoked without it.
-- Export what another module uses. An export is a promise; an unused one is a promise nobody asked for.
-- **A test is not a caller.** An export only tests import is allowed when it is a contract in its own right: a docblock that states it, an `@internal` tag, and a test that pins a property the public entry cannot reach cheaply (a URL validator, a parser). Otherwise test through the entry and drop the export.
+- Export what another module uses, and "export" here is whatever the language makes visible outside the module (`export`, a name without a leading underscore, a capitalised Go name, `pub`). An export is a promise; an unused one is a promise nobody asked for.
+- **A test is not a caller.** An export only tests import is allowed when it is a contract in its own right: a docblock that states it, the language's internal marker (`@internal` in TSDoc, a leading underscore in Python, `pub(crate)` or `#[doc(hidden)]` in Rust), and a test that pins a property the public entry cannot reach cheaply (a URL validator, a parser). Otherwise test through the entry and drop the export.
 - An optional parameter or field that production always passes is required; a default that only tests rely on is a test-only export by another name. A seam production never passes (a stub fetch, a clock) is one optional `deps` object on a documented entry, defaulting to the real thing, never a scatter of optional fields across several option types and never an option threaded through the entry point.
 - Never export a constant so a test can avoid restating its value. A test that derives its expectation from the code's constant cannot fail when the constant moves; the test states the number.
 - **Unused things never exist: no unused imports, constants, exports, parameters, or fields — ever.** That is a rule of this skill, whether or not a tool checks it. <!-- fill: if the gates run an unused-code checker, one or two sentences on how it runs and which tags or ignores it honours; delete if not --> A tag or ignore added to quiet a checker is the finding the checker was about to report. Types follow the function whose signature they carry and are not tagged. No tool sees an optional field nobody sets, a field nobody reads, or a return value every caller drops; check those by hand before considering any change done.
@@ -141,9 +143,9 @@ A roadmap invites the opposite: what is coming is known, so writing it early loo
 - Write the message where it is thrown. A message factory earns its place only when two sites throw the identical message; a module of one-caller factories puts every reader in two files.
 - Throw with a message that says what was attempted and with what input. The reader is a person, a calling program or a model deciding what to try next: `"no project with id 7; ids are 1–4"` lets them recover, `"invalid input"` does not. <!-- fill: one sentence on who reads an error in this repo (a calling program, an end user, an operator reading logs, a model) -->
 - Pick the error code or class by who is at fault: the caller's input, or this code. Where the dependency defines codes or error classes, check against its own rather than memory. One rule per failure kind, applied everywhere: if two paths report the same failure differently, one of them is wrong.
-- Catch where you can do something about it: add context and rethrow, turn an expected condition into a normal result, or clean up. Otherwise let it propagate to the boundary that reports it. The exception is code that runs outside any such boundary: event listeners, stream events, timers, promise continuations. There a throw can end the process, so guard each such entry once and keep the cause.
+- Catch where you can do something about it: add context and rethrow, turn an expected condition into a normal result, or clean up. Otherwise let it propagate to the boundary that reports it. The exception is code that runs outside any such boundary: event listeners, stream events, timers, promise continuations, goroutines, background threads. There a throw can end the process, so guard each such entry once and keep the cause.
 - Every failure keeps its cause (the status, the errno, the vendor's reason, sanitised and clipped) and names the next step, in a message to a user as much as in a log line. A message about missing configuration names each missing or malformed item.
-- `catch (error: unknown)` and narrow with `instanceof Error`.
+- Catch the narrowest error you can act on, and check what you caught before reading it: `catch (error: unknown)` narrowed with `instanceof Error` in TypeScript, a named exception class and never a bare `except:` in Python, `errors.Is`/`errors.As` in Go, a `match` on the error enum in Rust.
 - Validate at the boundary (input from outside, a dependency's callback payloads, files, environment, responses from other services) and trust the types inside. Defensive checks on values your own code just produced are noise.
 
 ## Tests
@@ -155,7 +157,7 @@ A roadmap invites the opposite: what is coming is known, so writing it early loo
 - Keep the runtime out where you can. Pure functions with structural stubs run in milliseconds and do not break on a dependency release. For code that needs the real thing (the file system, a child process, signals, a real parser), use the real thing, offline where possible; a hand-written fake is for what cannot run, and then it has the methods you call, not a re-implementation.
 - Drive the path a user or caller takes: the command, the request, the exported function. A test that calls an internal nobody can reach proves nothing about what they see.
 - Assert properties of the output (the order of items, a field present, nothing unescaped), not exact bytes or timestamps; byte pins turn every harmless reformat into a fake behaviour change.
-- Time is fake: unit tests drive timers with fake timers and the injected clock. Tests of the running system wait on an event or an observable state. No real sleeps, no polling with `waitFor`.
+- Time is fake: unit tests drive timers with fake timers and the injected clock. Tests of the running system wait on an event or an observable state. No real sleeps, no polling loop (`waitFor`, a `sleep` inside a retry).
 - Test helpers are shared like any other plumbing: one helper, not a copy per test file. <!-- fill: one sentence naming where shared test helpers live, e.g. "They are in `test/support/`."; delete if nowhere yet -->
 - Tests are code. The same rules on duplication and clarity apply, with one allowance: a little repetition in tests is better than a helper that hides what is being asserted.
 - Put the contract and security properties under test first: what must never reach a user, a log or the disk; what a malformed input does; what must not outlive the process. <!-- fill: this repo's own must-never properties, one sentence each -->
@@ -173,5 +175,8 @@ A roadmap invites the opposite: what is coming is known, so writing it early loo
 - Sandi Metz, *The Wrong Abstraction* — <https://sandimetz.com/blog/2016/1/20/the-wrong-abstraction>
 - Dan Abramov, *Goodbye, Clean Code* — <https://overreacted.io/goodbye-clean-code/>
 - Casey Muratori, *Semantic Compression* — <https://caseymuratori.com/blog_0015>
-- TypeScript Handbook, *Do's and Don'ts* — <https://www.typescriptlang.org/docs/handbook/declaration-files/do-s-and-don-ts.html>
+- <!-- fill: keep the line below for this repo's language and delete the others, with this comment --> TypeScript Handbook, *Do's and Don'ts* — <https://www.typescriptlang.org/docs/handbook/declaration-files/do-s-and-don-ts.html>
+- Python, *PEP 8* and *PEP 484* — <https://peps.python.org/pep-0008/>, <https://peps.python.org/pep-0484/>
+- *Effective Go* — <https://go.dev/doc/effective_go>
+- *Rust API Guidelines* — <https://rust-lang.github.io/api-guidelines/>
 - Google, *What to look for in a code review* — <https://google.github.io/eng-practices/review/reviewer/looking-for.html>

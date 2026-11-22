@@ -68,17 +68,14 @@ if [ -e "$conf" ]; then
   say "ok craft-worktree $conf"
 else
   tmp=$(mktemp "${TMPDIR:-/tmp}/craft-wt.XXXXXX") || { say "fail craft-worktree mktemp"; exit 1; }
-  echo "# init-craft: worktree layer (link <glob> | copy <glob> | install)" > "$tmp"
+  echo "# init-craft: worktree layer (link <glob> | copy <glob> | install | run <command>)" > "$tmp"
   # keep only the built-in entries that match something in the main checkout
   sh "$skill/scripts/provision.sh" --defaults | while read -r mode pat; do
     for s in "$main"/$pat; do
       if [ -e "$s" ] || [ -L "$s" ]; then echo "$mode $pat" >> "$tmp"; break; fi
     done
   done
-  if [ -f "$main/pnpm-lock.yaml" ] || [ -f "$main/package-lock.json" ] || [ -f "$main/yarn.lock" ] \
-     || [ -f "$main/bun.lock" ] || [ -f "$main/bun.lockb" ]; then
-    echo install >> "$tmp"
-  fi
+  [ -n "$(sh "$skill/scripts/provision.sh" --detect "$main")" ] && echo install >> "$tmp"
   if [ "$dry" = 1 ]; then say "would write craft-worktree $conf"
   else
     mkdir -p "$common/info" && cp "$tmp" "$conf" && say "wrote craft-worktree $conf" \

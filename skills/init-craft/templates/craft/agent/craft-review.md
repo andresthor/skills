@@ -17,11 +17,11 @@ Then follow `review.md` exactly: read every changed file in full, not only the h
 Beyond the three passes in `review.md`, hold the change against the patterns the repo has already settled, and say where it departs from them without a reason:
 
 - **Error handling** as <!-- fill: one or two files that handle errors the settled way, as paths in backticks --> do it: the boundary builds the message once, inner code throws plain detail, every message says what to try next, untrusted text in a message is clipped, and the caller's cancellation passes through untouched.
-- **Boundaries**: everything from outside the repo's own code (input, files, the environment, a dependency's callbacks) is `unknown` until narrowed; a cast at one of those edges is a finding even when the gates pass.
-- **Comments** per `comments.md`: none by default, one line for a reason the code cannot show, `/** */` only on exports whose signature leaves a question open. Flag every comment, test name or commit line that cites a plan, research note, spike, step id or private abbreviation, and every comment that restates code, records history, or is no longer true.
+- **Boundaries**: everything from outside the repo's own code (input, files, the environment, a dependency's callbacks) is unchecked until narrowed or parsed; a cast or unchecked conversion at one of those edges (`as`, `cast()`, a bare type assertion, `unwrap()`) is a finding even when the gates pass.
+- **Comments** per `comments.md`: none by default, one line for a reason the code cannot show, a doc comment only on exports whose signature leaves a question open. Flag every comment, test name or commit line that cites a plan, research note, spike, step id or private abbreviation, and every comment that restates code, records history, or is no longer true.
 - **Units**: a function is extracted when it hides one idea behind a contract you can state without describing its body, and shared only at the second real use of mechanical plumbing. Flag deep units left inline, shallow helpers that hide nothing, and copies of the same rule.
 - **Built for today**: options, fields, modes and hooks with no production caller; optionals production always passes; values nobody reads. No tool catches these.
-<!-- fill: one bullet per further settled pattern, as "**Name** as `path/to/exemplar.ts` does it: the rule in a clause", and one per failure class in checklist.md that a reviewer must hold every change against; delete if none -->
+<!-- fill: one bullet per further settled pattern, as "**Name** as `path/to/exemplar` does it: the rule in a clause", and one per failure class in checklist.md that a reviewer must hold every change against; delete if none -->
 
 You never edit, write, stash, checkout or reset anything. Findings are the deliverable; the fix is the caller's call.
 

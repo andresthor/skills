@@ -2,6 +2,8 @@
 
 A comment carries what the code cannot say: a reason, a constraint, a consequence. Everything else belongs in a name, a type, or nowhere.
 
+<!-- fill: rewrite each code block in this file in the repo's main language and its comment syntax, keeping what it shows; then delete this comment -->
+
 ## Contents
 
 - [Two kinds](#two-kinds)
@@ -17,7 +19,7 @@ A comment carries what the code cannot say: a reason, a constraint, a consequenc
 
 | | Interface comment | Implementation comment |
 | --- | --- | --- |
-| Syntax | `/** … */` | `// …` |
+| Syntax | the language's doc comment: `/** … */`, a docstring, `///`, a `// Name …` block above a Go declaration | a line comment: `// …`, `# …` |
 | Reader | someone calling the code, who should not have to open it | someone changing the code |
 | Says | what the caller can rely on and must provide | why the code is the way it is |
 | Length | as long as the contract needs | one line; two at most |
@@ -45,13 +47,13 @@ Things that belong there, when they apply:
 - which inputs are untrusted and what has been done about it
 - for a module header: what the module is for and the one design decision a newcomer would otherwise question
 
-Leave out `@param` and `@returns` lines that restate the name and type. Keep one only when it adds a constraint:
+Leave out per-parameter and return lines (`@param` and `@returns`, `Args:` and `Returns:`, `# Arguments`) that restate the name and type. Keep one only when it adds a constraint:
 
 ```ts
 /** @param timeout Milliseconds. `0` disables the timeout. */
 ```
 
-Never put types in JSDoc; TypeScript has them.
+Never repeat in a doc comment a type the signature already declares.
 
 ## What goes in an implementation comment
 
@@ -101,7 +103,7 @@ A published, versioned standard is not one of these: `RFC 9110 §15.4` names a d
 What to do instead:
 
 - **The document held a reason.** State the reason itself, as a present-tense fact about the code, in one line. If it takes a paragraph, the code needs simplifying first.
-- **The document held a contract of a dependency or protocol.** Name the module and the behaviour by their public names (`Client.send` resolves after the server acknowledges), and pin it with a test. A line number into a dependency's compiled output rots at the next release; the test does not.
+- **The document held a contract of a dependency or protocol.** Name the module and the behaviour by their public names (`Client.send` resolves after the server acknowledges), and pin it with a test. A line number into a dependency's installed files rots at the next release; the test does not.
 - **The id marked a step of a recipe.** If the steps matter, the function names say them. A numbered list of bare ids is a reading guide to a document the reader does not have.
 - **The code is for a later change.** Delete it. It comes back with that change, and its caller.
 - **A test was named for a scenario.** Name it for the property it protects; a scenario id says nothing to someone who reads the test list to learn the contract.
@@ -215,6 +217,9 @@ if (!target.startsWith(root + sep)) throw new Error(`${rel} is outside ${root}`)
 ## Sources
 
 - Ousterhout and Martin, *APOSD vs Clean Code*, comments section — <https://github.com/johnousterhout/aposd-vs-clean-code>
-- Google TypeScript Style Guide, comments — <https://google.github.io/styleguide/tsguide.html#comments-documentation>
+- <!-- fill: keep the line below for this repo's language and delete the others, with this comment --> Google TypeScript Style Guide, comments — <https://google.github.io/styleguide/tsguide.html#comments-documentation>
+- Python, *PEP 257: Docstring Conventions* — <https://peps.python.org/pep-0257/>
+- *Go Doc Comments* — <https://go.dev/doc/comment>
+- The rustdoc book, *How to write documentation* — <https://doc.rust-lang.org/rustdoc/how-to-write-documentation.html>
 
 Where the maintainer's own instructions are stricter, they win.

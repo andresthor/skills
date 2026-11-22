@@ -11,8 +11,11 @@ usage: craft-provision [--dry-run] <worktree>...      provision these worktrees
        craft-provision [--dry-run] --all              every linked worktree (backfill)
        craft-provision [--dry-run] --install-only <worktree>...
        craft-provision --defaults                     print the built-in entry list
+       craft-provision --detect <dir>                 print the package manager `install` would use
        craft-provision --help
-Config: <common-dir>/info/craft-worktree  (link <glob> | copy <glob> | install)
+Config: <common-dir>/info/craft-worktree  (link <glob> | copy <glob> | install | run <command>)
+  install        the frozen install for the lockfile found: pnpm, npm, yarn, bun or uv
+  run <command>  any other setup, run once per worktree with sh, in the worktree
 Without that file the built-in list applies; it has no `install` line, so no dependencies are installed.
 USAGE
 }
@@ -32,7 +35,7 @@ copy .mcp.json
 LIST
 }
 set -u
-dry=0 all=0 instonly=0 n=0
+dry=0 all=0 instonly=0 detectonly=0 n=0
 for a; do
   case $a in
     --help|-h) usage; exit 0 ;;
@@ -40,11 +43,25 @@ for a; do
     --all) all=1 ;;
     --install-only) instonly=1 ;;
     --defaults) defaults; exit 0 ;;
+    --detect) detectonly=1 ;;
     -*) echo "fail option $a unknown" >&2; usage; exit 2 ;;
     *) n=$((n+1)) ;;
   esac
 done
 if [ "$all" = 0 ] && [ "$n" = 0 ]; then usage; exit 2; fi
+
+# Which frozen install a checkout needs, from its lockfile; empty when none is known.
+# Go and Rust need none: their module caches are shared by every worktree.
+detect() { # $1 dir
+  if [ -f "$1/pnpm-lock.yaml" ]; then echo pnpm
+  elif [ -f "$1/package-lock.json" ]; then echo npm
+  elif [ -f "$1/yarn.lock" ]; then echo yarn
+  elif [ -f "$1/bun.lock" ] || [ -f "$1/bun.lockb" ]; then echo bun
+  elif [ -f "$1/uv.lock" ]; then echo uv
+  fi
+}
+
+if [ "$detectonly" = 1 ]; then for d; do case $d in -*) ;; *) detect "$d" ;; esac; done; exit 0; fi
 
 common=$(git rev-parse --path-format=absolute --git-common-dir) || exit 1
 conf="$common/info/craft-worktree"
@@ -91,22 +108,42 @@ place() { # $1 mode, $2 worktree, $3 rel
   git -C "$2" check-ignore -q --no-index -- "$3" || exclude "$3"
 }
 
+installed() { # $1 dir, $2 package manager: the directory its install creates
+  case $2 in uv) [ -d "$1/.venv" ] ;; *) [ -d "$1/node_modules" ] ;; esac
+}
+
 # A frozen-lockfile install fetches only what the main checkout already resolved
 install() { # $1 worktree
-  [ -d "$1/node_modules" ] && return 0
-  if [ -f "$1/pnpm-lock.yaml" ]; then
-    if [ "$dry" = 1 ]; then say "would install deps pnpm $1"; return 0; fi
-    (cd "$1" && pnpm install --frozen-lockfile --prefer-offline --ignore-scripts) </dev/null >&2
-  elif [ -f "$1/package-lock.json" ]; then
-    if [ "$dry" = 1 ]; then say "would install deps npm $1"; return 0; fi
-    (cd "$1" && npm ci --prefer-offline --ignore-scripts --no-audit --no-fund) </dev/null >&2
-  elif [ -f "$1/yarn.lock" ] && command -v yarn >/dev/null 2>&1; then
-    if [ "$dry" = 1 ]; then say "would install deps yarn $1"; return 0; fi
-    (cd "$1" && yarn install --frozen-lockfile --prefer-offline --ignore-scripts) </dev/null >&2
-  elif [ -f "$1/bun.lock" ] || [ -f "$1/bun.lockb" ]; then
-    if [ "$dry" = 1 ]; then say "would install deps bun $1"; return 0; fi
-    (cd "$1" && bun install --frozen-lockfile --ignore-scripts) </dev/null >&2
-  fi || say "warn install dependency install failed in $1 (gates will fail until it runs)"
+  pm=$(detect "$1")
+  [ -n "$pm" ] || return 0
+  installed "$1" "$pm" && return 0
+  if [ "$dry" = 1 ]; then say "would install deps $pm $1"; return 0; fi
+  command -v "$pm" >/dev/null 2>&1 || { say "warn install $pm not on PATH; dependencies not installed in $1"; return 0; }
+  case $pm in
+    pnpm) (cd "$1" && pnpm install --frozen-lockfile --prefer-offline --ignore-scripts) ;;
+    npm) (cd "$1" && npm ci --prefer-offline --ignore-scripts --no-audit --no-fund) ;;
+    yarn) (cd "$1" && yarn install --frozen-lockfile --prefer-offline --ignore-scripts) ;;
+    bun) (cd "$1" && bun install --frozen-lockfile --ignore-scripts) ;;
+    uv) (cd "$1" && uv sync --frozen) ;;
+  esac </dev/null >&2 || say "warn install dependency install failed in $1 (gates will fail until it runs)"
+}
+
+# `run` lines are the repo's own setup commands; a stamp in the worktree's git dir keeps a
+# second provisioning of the same worktree from running them again.
+run_lines() { # $1 worktree
+  case "$nl$entries" in *"${nl}run "*) ;; *) return 0 ;; esac
+  stamp=$(git -C "$1" rev-parse --path-format=absolute --git-dir 2>/dev/null)/craft-run-done
+  [ -e "$stamp" ] && return 0
+  ok=1
+  while read -r mode cmd || [ -n "$mode" ]; do
+    [ "$mode" = run ] && [ -n "$cmd" ] || continue
+    if [ "$dry" = 1 ]; then say "would run $cmd"; continue; fi
+    if (cd "$1" && sh -c "$cmd") </dev/null >&2; then say "wrote run $cmd"
+    else say "warn run failed in $1: $cmd"; ok=0; fi
+  done <<LIST
+$entries
+LIST
+  if [ "$dry" = 0 ] && [ "$ok" = 1 ]; then : > "$stamp"; fi
 }
 
 provision() { # $1 worktree
@@ -124,6 +161,7 @@ provision() { # $1 worktree
 $entries
 LIST
   case "$nl$entries$nl" in *"${nl}install$nl"*) install "$1" ;; esac
+  run_lines "$1"
   return 0
 }
 
