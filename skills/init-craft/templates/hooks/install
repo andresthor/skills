@@ -1,0 +1,41 @@
+#!/bin/sh
+# init-craft v2
+# Tracked per-repo installer (copy of init-craft templates/hooks/install; run by `prepare`).
+# Writes .git/hooks/pre-commit and commit-msg as shims that run the checkout's bin/hooks/<name>.
+# Works without the init-craft skill. Only replaces hooks that are absent or carry the marker.
+# Never touches post-checkout. Always exits 0.
+common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || exit 0
+hp=$(git config --local core.hooksPath 2>/dev/null)
+[ "$hp" = bin/hooks ] && git config --local --unset core.hooksPath
+mkdir -p "$common/hooks" 2>/dev/null || exit 0
+for n in pre-commit commit-msg; do
+  f="$common/hooks/$n"
+  if [ -e "$f" ] && ! grep -q '# init-craft' "$f" 2>/dev/null; then
+    echo "skip $n exists without init-craft marker" >&2
+    continue
+  fi
+  {
+    cat <<'SHIM'
+#!/bin/sh
+# init-craft v2
+# Local shim (not tracked): runs this checkout's tracked hook of the same name.
+# A checkout without one (older branch, other repo layout) passes. Bypass: git commit --no-verify.
+name=${0##*/}
+top=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+if [ "$name" = pre-commit ]; then
+  common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+  if [ ! -d "$top/node_modules" ] && [ -n "$common" ] && [ -x "$common/hooks/craft-provision" ]; then
+    "$common/hooks/craft-provision" --install-only "$top" >&2 || true
+  fi
+  git diff --quiet 2>/dev/null || echo "warn pre-commit unstaged tracked changes; the hook checks the working tree, not the index" >&2
+fi
+for h in "$top/bin/hooks/$name" "$top/bin/$name"; do
+  [ -f "$h" ] || continue
+  if [ -x "$h" ]; then "$h" "$@"; else sh "$h" "$@"; fi   # executable: honour its shebang
+  exit $?
+done
+exit 0
+SHIM
+  } > "$f.tmp.$$" && chmod +x "$f.tmp.$$" && mv "$f.tmp.$$" "$f" || rm -f "$f.tmp.$$"
+done
+exit 0

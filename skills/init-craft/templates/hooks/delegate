@@ -1,0 +1,19 @@
+#!/bin/sh
+# init-craft v2
+# Local shim (not tracked): runs this checkout's tracked hook of the same name.
+# A checkout without one (older branch, other repo layout) passes. Bypass: git commit --no-verify.
+name=${0##*/}
+top=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+if [ "$name" = pre-commit ]; then
+  common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+  if [ ! -d "$top/node_modules" ] && [ -n "$common" ] && [ -x "$common/hooks/craft-provision" ]; then
+    "$common/hooks/craft-provision" --install-only "$top" >&2 || true
+  fi
+  git diff --quiet 2>/dev/null || echo "warn pre-commit unstaged tracked changes; the hook checks the working tree, not the index" >&2
+fi
+for h in "$top/bin/hooks/$name" "$top/bin/$name"; do
+  [ -f "$h" ] || continue
+  if [ -x "$h" ]; then "$h" "$@"; else sh "$h" "$@"; fi   # executable: honour its shebang
+  exit $?
+done
+exit 0

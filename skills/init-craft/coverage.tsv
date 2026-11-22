@@ -1,0 +1,25 @@
+concept	canonical	tool	mechanism	check
+global-instructions	<global> (optional)	claude	~/.claude/CLAUDE.md link	link-to ~/.claude/CLAUDE.md <global>
+global-instructions	<global> (optional)	opencode	~/.config/opencode/AGENTS.md link	link-to ~/.config/opencode/AGENTS.md <global>
+global-instructions	<global> (optional)	pi	<profile>/AGENTS.md link	link-to <profile>/AGENTS.md <global>
+repo-instructions	AGENTS.md (tracked, optional)	claude	CLAUDE.md imports it	native
+repo-instructions	AGENTS.md (tracked, optional)	opencode	native	native
+repo-instructions	AGENTS.md (tracked, optional)	pi	native	native
+local-instructions	AGENTS.local.md, imported by CLAUDE.local.md	claude	native (CLAUDE.local.md)	local-instructions claude
+local-instructions	AGENTS.local.md, imported by CLAUDE.local.md	opencode	AGENTS.md sends it there; else global instructions: ["CLAUDE.local.md"] (opencode >= 2.1.0)	local-instructions opencode
+local-instructions	AGENTS.local.md, imported by CLAUDE.local.md	pi	AGENTS.md sends it there; else adapter (claude-compat.ts)	local-instructions pi <profile>
+repo-skills	.claude/skills/*	claude	native	native
+repo-skills	.claude/skills/*	opencode	native	native
+repo-skills	.claude/skills/*	pi	adapter (claude-compat.ts)	native && adapter-linked <profile>
+review-agent	.claude/agents/*	claude	native	native
+review-agent	.claude/agents/*	opencode	none	none
+review-agent	.claude/agents/*	pi	none, unless an extension loads .claude/agents	pi-agents
+commit-gates	bin/hooks/* via .git/hooks	claude	git	git-hook-installed pre-commit commit-msg
+commit-gates	bin/hooks/* via .git/hooks	opencode	git	git-hook-installed pre-commit commit-msg
+commit-gates	bin/hooks/* via .git/hooks	pi	git	git-hook-installed pre-commit commit-msg
+worktree-layer	<common>/info/craft-worktree	claude	git post-checkout; WorktreeCreate hook (optional)	craft-worktree-present
+worktree-layer	<common>/info/craft-worktree	opencode	git post-checkout	craft-worktree-present
+worktree-layer	<common>/info/craft-worktree	pi	git post-checkout	craft-worktree-present
+context-workspace	.context/ + pointer in the local instructions	claude	via local instructions	context-present && local-instructions claude
+context-workspace	.context/ + pointer in the local instructions	opencode	via local instructions	context-present && local-instructions opencode
+context-workspace	.context/ + pointer in the local instructions	pi	via local instructions	context-present && local-instructions pi <profile>

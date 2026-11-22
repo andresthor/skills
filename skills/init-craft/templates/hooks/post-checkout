@@ -1,0 +1,13 @@
+#!/bin/sh
+# init-craft v2
+# Local post-checkout (not tracked). Provisions a NEW linked worktree only.
+# Must always exit 0: a failing post-checkout makes `git worktree add` itself fail.
+case ${1:-} in *[!0]*|'') exit 0 ;; esac        # old ref not all zeros (sha1 or sha256) → branch switch
+gd=$(git rev-parse --path-format=absolute --git-dir 2>/dev/null) || exit 0
+cd_=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || exit 0
+[ "$gd" = "$cd_" ] && exit 0                   # main checkout or fresh clone
+p="$cd_/hooks/craft-provision"
+[ -x "$p" ] || exit 0
+top=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+"$p" "$top" </dev/null 1>&2 || echo "fail provision $top failed; rerun: $p $top" >&2
+exit 0
